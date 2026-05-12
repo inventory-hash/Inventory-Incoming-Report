@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Smart Stock Manager</title>
+<title>Incoming Calls Report</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -15,6 +16,7 @@
     --border:    #2e2e34;
     --accent:    #7c6ef7;
     --accent2:   #3ecf8e;
+    --green:     #3ecf8e;
     --accent3:   #f7a14e;
     --text:      #e8e8ec;
     --muted:     #8a8a96;
@@ -114,7 +116,35 @@
   .stat-sub   { font-size: .72rem; color: var(--muted); }
   .c-accent  { color: var(--accent); }
   .c-green   { color: var(--accent2); }
+  .c-red     { color: var(--danger); }
   .c-amber   { color: var(--accent3); }
+
+  /* ── Status Pills ── */
+  .status-pills { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:2rem; }
+  .status-pill {
+    display:flex; align-items:center; gap:6px;
+    background:var(--card); border:1px solid var(--border);
+    border-radius:20px; padding:.3rem .85rem;
+    font-size:.75rem; font-family:var(--mono);
+    cursor:pointer; transition:all .15s; user-select:none;
+  }
+  .status-pill:hover { border-color:var(--accent); }
+  .status-pill.active { border-color:var(--accent); background:rgba(124,110,247,.12); }
+  .pill-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .pill-count { font-weight:700; }
+
+  /* ── Charts ── */
+  .charts-grid { display:grid; grid-template-columns: repeat(12, 1fr); gap: 1.5rem; }
+  .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  .chart-card h3 { font-size: .8rem; font-family: var(--mono); color: var(--muted); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: .06em; }
+  .chart-card.col-span-6 { grid-column: span 12; }
+  .chart-card.col-span-4 { grid-column: span 12; }
+  .chart-card.col-span-8 { grid-column: span 12; }
+  @media (min-width: 1024px) {
+    .chart-card.col-span-6 { grid-column: span 6; }
+    .chart-card.col-span-4 { grid-column: span 4; }
+    .chart-card.col-span-8 { grid-column: span 8; }
+  }
 
   /* ── Toolbar ── */
   .toolbar {
@@ -346,6 +376,10 @@ let sortAsc   = true;
 let currentPage = 1;
 const PAGE_SIZE = 20;
 let editRowIndex = null;
+let activeStatus = "";
+let activeAgent = "";
+let activeInteraction = "";
+const charts = {};
 
 // ── Bootstrap ─────────────────────────────────────────────
 document.getElementById("setup-banner").classList.add("hidden");
@@ -356,6 +390,7 @@ document.getElementById('start-date-filter').value = startDate.toISOString().spl
 document.getElementById('end-date-filter').value = endDate.toISOString().split('T')[0];
 
 fetchData();
+setInterval(fetchData, 5 * 60 * 1000); // Auto-refresh every 5 minutes
 
 // ── Fetch ─────────────────────────────────────────────────
 
@@ -370,7 +405,6 @@ async function fetchData() {
     headers = allData.length ? Object.keys(allData[0]) : [];
     buildColFilter();
     applyFilter();
-    calculateAndRenderStats();
     document.getElementById("last-sync").textContent =
       "Synced " + new Date().toLocaleTimeString();
   } catch (e) {
@@ -379,29 +413,11 @@ async function fetchData() {
 }
 
 function onDateRangeChange() {
-    applyFilter(); // Re-filter the main table
-    calculateAndRenderStats(); // Re-calculate the stats
+    applyFilter();
 }
 
-function calculateAndRenderStats() {    
-    const rangeData = getRangeData();
-
-    const daysInRange = (endDate - startDate) / (1000 * 60 * 60 * 24) + 1;
-    const totalCalls = rangeData.length;
-    const doneCalls = rangeData.filter(r => r.Status1 === 'Done').length;
-    const closeCalls = rangeData.filter(r => r.Status1 === 'Close').length;
-    const notRelatedCalls = rangeData.filter(r => r.Status1 === 'not related calls').length;
-    const issuesCalls = rangeData.filter(r => r.Status1 === 'Issues').length;
-    const trainingCalls = rangeData.filter(r => r.Status1 === 'Training').length;
-
-    document.getElementById('stat-total-calls').textContent = totalCalls;
-    document.getElementById('stat-avg-total-calls').textContent = (totalCalls / daysInRange).toFixed(1);
-    document.getElementById('stat-done-calls').textContent = doneCalls;
-    document.getElementById('stat-avg-done-calls').textContent = (doneCalls / daysInRange).toFixed(1);
-    document.getElementById('stat-close-calls').textContent = closeCalls;
-    document.getElementById('stat-not-related-calls').textContent = notRelatedCalls;
-    document.getElementById('stat-issues-calls').textContent = issuesCalls;
-    document.getElementById('stat-training-calls').textContent = trainingCalls;
+function onFilterChange() {
+    applyFilter();
 }
 
 function getRangeData() {
@@ -425,15 +441,29 @@ function getRangeData() {
 function applyFilter() {
   const q   = document.getElementById("search-input").value.toLowerCase();
   const col = document.getElementById("col-filter").value;
+  activeAgent = document.getElementById("agent-filter").value;
+  activeInteraction = document.getElementById("interaction-filter").value;
 
-  // Get date range values to filter the main table
-  const dateFilteredData = getRangeData();
+  const dateFilteredData = getRangeData(); // 1. Filter by date first
 
-  filtered = dateFilteredData.filter(row => {
+  // Update stats and dynamic filters based on date-filtered data
+  calculateAndRenderStats(dateFilteredData);
+  buildStatusPills(dateFilteredData);
+  buildDynamicFilters(dateFilteredData);
+
+  filtered = dateFilteredData.filter(row => { // 2. Apply other filters
+    const statusOk = activeStatus === "" || (row.Status1 || "") === activeStatus;
+    const agentOk = activeAgent === "" || (row['Agent Name'] || "") === activeAgent;
+    const interactionOk = activeInteraction === "" || (row['Interaction Type'] || "") === activeInteraction;
     // Search query check
     const target = col ? String(row[col]) : Object.values(row).join(" ");
-    return target.toLowerCase().includes(q);
+    const searchOk = target.toLowerCase().includes(q);
+    return statusOk && agentOk && interactionOk && searchOk;
   });
+
+  // Update charts based on the final filtered data
+  renderCharts(filtered);
+
   if (sortCol) {
     filtered.sort((a, b) => {
       const va = a[sortCol], vb = b[sortCol];
@@ -444,8 +474,139 @@ function applyFilter() {
     });
   }
   currentPage = 1;
-  // The "filtered" stat box was removed, so this line is no longer needed.
   renderTable();
+}
+
+function calculateAndRenderStats(data) {
+    const totalCalls = data.length;
+    const doneCalls = data.filter(r => r.Status1 === 'Done').length;
+    const closeCalls = data.filter(r => r.Status1 === 'Close').length;
+    const pendingCalls = data.filter(r => r.Status1 === 'Pending').length;
+
+    const uniqueDates = new Set(data.map(r => r.Date).filter(Boolean));
+    const activeDays = uniqueDates.size > 0 ? uniqueDates.size : 1;
+
+    document.getElementById('stat-total-calls').textContent = totalCalls;
+    document.getElementById('stat-done-calls').textContent = doneCalls;
+    document.getElementById('stat-pending-calls').textContent = pendingCalls;
+    document.getElementById('stat-closed-calls').textContent = closeCalls;
+    document.getElementById('stat-active-days').textContent = uniqueDates.size;
+    document.getElementById('stat-done-percentage').textContent = totalCalls > 0 ? `${((doneCalls / totalCalls) * 100).toFixed(1)}%` : '0%';
+    document.getElementById('stat-avg-calls').textContent = (totalCalls / activeDays).toFixed(1);
+    document.getElementById('stat-avg-done-calls').textContent = (doneCalls / activeDays).toFixed(1);
+}
+
+function buildStatusPills(data) {
+  const counts = {};
+  data.forEach(row => {
+    const s = String(row.Status1 || "N/A").trim();
+    counts[s] = (counts[s] || 0) + 1;
+  });
+  const container = document.getElementById("status-pills");
+  const allPill = `<div class="status-pill${activeStatus === '' ? ' active' : ''}" onclick="setStatusFilter('')">
+    <span class="pill-dot" style="background:var(--muted)"></span>All <span class="pill-count">${data.length}</span></div>`;
+  const pills = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([s, c]) => {
+    const color = s === 'Done' ? 'var(--green)' : s === 'Pending' ? 'var(--danger)' : 'var(--accent3)';
+    return `<div class="status-pill${activeStatus === s ? ' active' : ''}" onclick="setStatusFilter('${esc(s)}')">
+      <span class="pill-dot" style="background:${color}"></span>${esc(s)} <span class="pill-count">${c}</span></div>`;
+  }).join("");
+  container.innerHTML = allPill + pills;
+}
+
+function setStatusFilter(s) {
+    activeStatus = s;
+    applyFilter();
+}
+
+function buildDynamicFilters(data) {
+    const agentFilter = document.getElementById("agent-filter");
+    const interactionFilter = document.getElementById("interaction-filter");
+
+    const agents = [...new Set(data.map(r => r['Agent Name']).filter(Boolean))].sort();
+    const interactions = [...new Set(data.map(r => r['Interaction Type']).filter(Boolean))].sort();
+
+    agentFilter.innerHTML = `<option value="">All Agents</option>` + agents.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+    interactionFilter.innerHTML = `<option value="">All Interactions</option>` + interactions.map(i => `<option value="${esc(i)}">${esc(i)}</option>`).join('');
+
+    agentFilter.value = activeAgent;
+    interactionFilter.value = activeInteraction;
+}
+
+function renderCharts(data) {
+    // 1. Daily Call Trend
+    const dailyCounts = data.reduce((acc, row) => {
+        if (row.Date) { acc[row.Date] = (acc[row.Date] || 0) + 1; }
+        return acc;
+    }, {});
+    const sortedDaily = Object.entries(dailyCounts).sort((a, b) => new Date(a[0]) - new Date(b[0]));
+    updateChart('dailyTrend', { labels: sortedDaily.map(d => d[0]), datasets: [{ label: 'Total Calls', data: sortedDaily.map(d => d[1]), borderColor: 'var(--accent)', tension: 0.1 }] });
+
+    // 2. Status-wise Pie Chart
+    const statusCounts = data.reduce((acc, row) => {
+        const s = row.Status1 || 'N/A';
+        acc[s] = (acc[s] || 0) + 1;
+        return acc;
+    }, {});
+    updateChart('statusPie', { labels: Object.keys(statusCounts), datasets: [{ data: Object.values(statusCounts), backgroundColor: Object.keys(statusCounts).map(s => s === 'Done' ? 'var(--green)' : s === 'Pending' ? 'var(--danger)' : '#f7a14e') }] }, 'doughnut');
+
+    // 3. Agent-wise Call Count
+    const agentCounts = data.reduce((acc, row) => {
+        const agent = row['Agent Name'] || 'Unassigned';
+        acc[agent] = (acc[agent] || 0) + 1;
+        return acc;
+    }, {});
+    const sortedAgents = Object.entries(agentCounts).sort((a, b) => b[1] - a[1]).slice(0, 15); // Top 15
+    updateChart('agentCount', { labels: sortedAgents.map(a => a[0]), datasets: [{ label: 'Calls', data: sortedAgents.map(a => a[1]), backgroundColor: 'rgba(124, 110, 247, 0.6)' }] }, 'bar');
+
+    // 4. Done vs Pending
+    const donePending = data.reduce((acc, row) => {
+        const agent = row['Agent Name'] || 'Unassigned';
+        if (!acc[agent]) acc[agent] = { Done: 0, Pending: 0 };
+        if (row.Status1 === 'Done') acc[agent].Done++;
+        if (row.Status1 === 'Pending') acc[agent].Pending++;
+        return acc;
+    }, {});
+    const sortedDonePending = Object.entries(donePending).sort((a, b) => (b[1].Done + b[1].Pending) - (a[1].Done + a[1].Pending)).slice(0, 15);
+    updateChart('doneVsPending', {
+        labels: sortedDonePending.map(a => a[0]),
+        datasets: [
+            { label: 'Done', data: sortedDonePending.map(a => a[1].Done), backgroundColor: 'var(--green)' },
+            { label: 'Pending', data: sortedDonePending.map(a => a[1].Pending), backgroundColor: 'var(--danger)' }
+        ]
+    }, 'bar', { scales: { x: { stacked: true }, y: { stacked: true } } });
+
+    // 5. Hour-wise Distribution
+    const hourCounts = Array(24).fill(0);
+    data.forEach(row => {
+        if (row.Date) { // Assuming time is part of the date or another column
+            const date = parseDate(row.Date); // Or use a time column
+            if (date) {
+                const hour = date.getHours();
+                hourCounts[hour]++;
+            }
+        }
+    });
+    updateChart('hourDistribution', { labels: Array.from({ length: 24 }, (_, i) => `${i}:00`), datasets: [{ label: 'Calls', data: hourCounts, backgroundColor: 'rgba(247, 161, 78, 0.6)' }] }, 'bar');
+}
+
+function updateChart(chartId, data, type = 'line', options = {}) {
+    const ctx = document.getElementById(chartId).getContext('2d');
+    if (charts[chartId]) {
+        charts[chartId].data = data;
+        charts[chartId].options = { ...charts[chartId].options, ...options };
+        charts[chartId].update();
+    } else {
+        charts[chartId] = new Chart(ctx, {
+            type: type,
+            data: data,
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: 'var(--muted)' } } },
+                scales: { x: { ticks: { color: 'var(--muted)' }, grid: { color: 'rgba(255,255,255,0.05)' } }, y: { ticks: { color: 'var(--muted)' }, grid: { color: 'rgba(255,255,255,0.05)' } } },
+                ...options
+            }
+        });
+    }
 }
 
 // ── Render ────────────────────────────────────────────────
@@ -595,6 +756,10 @@ function buildColFilter() {
   const sel = document.getElementById("col-filter");
   sel.innerHTML = `<option value="">All columns</option>` +
     headers.map(h => `<option value="${esc(h)}">${esc(h)}</option>`).join("");
+
+    // Also add static filter options here if needed, but dynamic is better
+    document.getElementById("agent-filter").innerHTML = `<option value="">All Agents</option>`;
+    document.getElementById("interaction-filter").innerHTML = `<option value="">All Interactions</option>`;
 }
 
 function parseDate(dateString) {
