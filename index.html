@@ -421,11 +421,21 @@ function calculateAndRenderStats() {
 function applyFilter() {
   const q   = document.getElementById("search-input").value.toLowerCase();
   const col = document.getElementById("col-filter").value;
-  // Note: The main table is not filtered by date in this version, only the stats are.
-  // You could add date filtering here if needed for the main table.
+
+  // Get date range values to filter the main table
+  const startDateStr = document.getElementById("start-date-filter").value;
+  const endDateStr = document.getElementById("end-date-filter").value;
+  const startDate = startDateStr ? new Date(startDateStr) : null;
+  const endDate = endDateStr ? new Date(endDateStr) : null;
+  if (endDate) endDate.setHours(23, 59, 59, 999); // Include the whole end day
+
   filtered = allData.filter(row => {
+    // Date range check
+    const rowDate = row.Date ? new Date(row.Date) : null;
+    const dateOk = !startDate || !endDate || !rowDate || (rowDate >= startDate && rowDate <= endDate);
+    // Search query check
     const target = col ? String(row[col]) : Object.values(row).join(" ");
-    return target.toLowerCase().includes(q);
+    return dateOk && target.toLowerCase().includes(q);
   });
   if (sortCol) {
     filtered.sort((a, b) => {
