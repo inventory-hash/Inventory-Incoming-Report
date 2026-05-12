@@ -394,7 +394,7 @@ function calculateAndRenderStats() {
     endDate.setHours(23, 59, 59, 999); // Include the whole end day
 
     const rangeData = allData.filter(row => {
-        const rowDate = new Date(row.Date);
+        const rowDate = parseDate(row.Date);
         return row.Date && rowDate >= startDate && rowDate <= endDate;
     });
 
@@ -431,7 +431,7 @@ function applyFilter() {
 
   filtered = allData.filter(row => {
     // Date range check
-    const rowDate = row.Date ? new Date(row.Date) : null;
+    const rowDate = row.Date ? parseDate(row.Date) : null;
     const dateOk = !startDate || !endDate || !rowDate || (rowDate >= startDate && rowDate <= endDate);
     // Search query check
     const target = col ? String(row[col]) : Object.values(row).join(" ");
@@ -598,6 +598,18 @@ function buildColFilter() {
   const sel = document.getElementById("col-filter");
   sel.innerHTML = `<option value="">All columns</option>` +
     headers.map(h => `<option value="${esc(h)}">${esc(h)}</option>`).join("");
+}
+
+function parseDate(dateString) {
+  if (!dateString) return null;
+  // Handles YYYY-MM-DD, DD-MM-YYYY, DD/MM/YYYY etc.
+  const parts = dateString.split(/[-/]/);
+  if (parts.length !== 3) return new Date(dateString); // Fallback for other formats
+  // Assuming DD-MM-YYYY if the first part is > 12 (day)
+  if (parseInt(parts[0], 10) > 12) {
+    return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`); // YYYY-MM-DD
+  }
+  return new Date(dateString); // Assume parsable format like YYYY-MM-DD or MM/DD/YYYY
 }
 
 function formatCell(val) {
