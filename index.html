@@ -601,19 +601,22 @@ function buildColFilter() {
 }
 
 function parseDate(dateString) {
-  if (!dateString || typeof dateString !== 'string') return null;
+    if (!dateString || typeof dateString !== 'string') return null;
 
-  // Specifically handle DD-MM-YYYY or DD/MM/YYYY
-  const dmyMatch = dateString.match(/^(\d{2})-/-/$/);
-  if (dmyMatch) {
-    const day = parseInt(dmyMatch[1], 10);
-    const month = parseInt(dmymatch[2], 10) - 1; // JS months are 0-11
-    const year = parseInt(dmyMatch[3], 10);
-    return new Date(year, month, day);
-  }
+    // Try to match DD-MM-YYYY or DD/MM/YYYY
+    const dmyMatch = dateString.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (dmyMatch) {
+        const day = parseInt(dmyMatch[1], 10);
+        const month = parseInt(dmyMatch[2], 10) - 1; // JS months are 0-11
+        const year = parseInt(dmyMatch[3], 10);
+        // Basic validation to ensure we're not creating an invalid date
+        if (year > 1000 && month >= 0 && month < 12 && day > 0 && day <= 31) {
+            return new Date(year, month, day);
+        }
+    }
 
-  // Fallback for other standard formats (like YYYY-MM-DD)
-  return new Date(dateString);
+    // Fallback for other standard formats that new Date() can handle (like YYYY-MM-DD)
+    return new Date(dateString);
 }
 
 function formatCell(val) {
