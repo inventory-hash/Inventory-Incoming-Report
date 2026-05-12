@@ -383,20 +383,8 @@ function onDateRangeChange() {
     calculateAndRenderStats(); // Re-calculate the stats
 }
 
-function calculateAndRenderStats() {
-    const startDateStr = document.getElementById("start-date-filter").value;
-    const endDateStr = document.getElementById("end-date-filter").value;
-
-    if (!startDateStr || !endDateStr) return;
-
-    const startDate = new Date(startDateStr);
-    const endDate = new Date(endDateStr);
-    endDate.setHours(23, 59, 59, 999); // Include the whole end day
-
-    const rangeData = allData.filter(row => {
-        const rowDate = parseDate(row.Date);
-        return row.Date && rowDate >= startDate && rowDate <= endDate;
-    });
+function calculateAndRenderStats() {    
+    const rangeData = getRangeData();
 
     const daysInRange = (endDate - startDate) / (1000 * 60 * 60 * 24) + 1;
     const totalCalls = rangeData.length;
@@ -416,6 +404,22 @@ function calculateAndRenderStats() {
     document.getElementById('stat-training-calls').textContent = trainingCalls;
 }
 
+function getRangeData() {
+    const startDateStr = document.getElementById("start-date-filter").value;
+    const endDateStr = document.getElementById("end-date-filter").value;
+
+    if (!startDateStr || !endDateStr) return [];
+
+    const startDate = new Date(startDateStr);
+    const endDate = new Date(endDateStr);
+    endDate.setHours(23, 59, 59, 999); // Include the whole end day
+
+    return allData.filter(row => {
+        const rowDate = parseDate(row.Date);
+        return row.Date && rowDate >= startDate && rowDate <= endDate;
+    });
+}
+
 // ── Filter & Sort ─────────────────────────────────────────
 
 function applyFilter() {
@@ -423,19 +427,12 @@ function applyFilter() {
   const col = document.getElementById("col-filter").value;
 
   // Get date range values to filter the main table
-  const startDateStr = document.getElementById("start-date-filter").value;
-  const endDateStr = document.getElementById("end-date-filter").value;
-  const startDate = startDateStr ? new Date(startDateStr) : null;
-  const endDate = endDateStr ? new Date(endDateStr) : null;
-  if (endDate) endDate.setHours(23, 59, 59, 999); // Include the whole end day
+  const dateFilteredData = getRangeData();
 
-  filtered = allData.filter(row => {
-    // Date range check
-    const rowDate = row.Date ? parseDate(row.Date) : null;
-    const dateOk = !startDate || !endDate || !rowDate || (rowDate >= startDate && rowDate <= endDate);
+  filtered = dateFilteredData.filter(row => {
     // Search query check
     const target = col ? String(row[col]) : Object.values(row).join(" ");
-    return dateOk && target.toLowerCase().includes(q);
+    return target.toLowerCase().includes(q);
   });
   if (sortCol) {
     filtered.sort((a, b) => {
