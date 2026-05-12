@@ -256,25 +256,52 @@
 <main>
   <!-- Stats -->
   <div class="stats-row" id="stats-row">
+    <!-- Row 1 -->
     <div class="stat-card">
-      <div class="stat-label">Total Rows</div>
-      <div class="stat-value c-accent" id="stat-rows">—</div>
-      <div class="stat-sub">in "App Data"</div>
+      <div class="stat-label">Total Calls</div>
+      <div class="stat-value c-accent" id="stat-total-calls">—</div>
+      <div class="stat-sub">For selected period</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Columns</div>
-      <div class="stat-value c-green" id="stat-cols">—</div>
-      <div class="stat-sub">fields detected</div>
+      <div class="stat-label">Avg Total Calls</div>
+      <div class="stat-value c-accent" id="stat-avg-total-calls">—</div>
+      <div class="stat-sub">Per day</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Filtered</div>
-      <div class="stat-value c-amber" id="stat-filtered">—</div>
-      <div class="stat-sub">rows visible</div>
+      <div class="stat-label">Done Calls</div>
+      <div class="stat-value c-green" id="stat-done-calls">—</div>
+      <div class="stat-sub">Status: "Done"</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Done Calls</div>
+      <div class="stat-value c-green" id="stat-avg-done-calls">—</div>
+      <div class="stat-sub">Per day</div>
+    </div>
+    <!-- Row 2 -->
+    <div class="stat-card">
+      <div class="stat-label">Close Calls</div>
+      <div class="stat-value c-amber" id="stat-close-calls">—</div>
+      <div class="stat-sub">Status: "Close"</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Not Related Calls</div>
+      <div class="stat-value c-amber" id="stat-not-related-calls">—</div>
+      <div class="stat-sub">Status: "not related calls"</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Issues</div>
+      <div class="stat-value c-danger" id="stat-issues-calls">—</div>
+      <div class="stat-sub">Status: "Issues"</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Training</div>
+      <div class="stat-value" id="stat-training-calls" style="color: #5bc8f5;">—</div>
+      <div class="stat-sub">Status: "Training"</div>
     </div>
   </div>
 
   <!-- Toolbar -->
-  <div class="toolbar">
+  <div class="toolbar" style="margin-top: 3rem;">
     <input class="search-box" id="search-input" placeholder="Search across all columns…" oninput="applyFilter()" />
     <select class="search-box" id="col-filter" style="flex:0;min-width:140px;" onchange="applyFilter()">
       <option value="">All columns</option>
@@ -322,6 +349,12 @@ let editRowIndex = null;
 
 // ── Bootstrap ─────────────────────────────────────────────
 document.getElementById("setup-banner").classList.add("hidden");
+const now = new Date();
+const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+document.getElementById('start-date-filter').value = startDate.toISOString().split('T')[0];
+document.getElementById('end-date-filter').value = endDate.toISOString().split('T')[0];
+
 fetchData();
 
 // ── Fetch ─────────────────────────────────────────────────
@@ -337,8 +370,7 @@ async function fetchData() {
     headers = allData.length ? Object.keys(allData[0]) : [];
     buildColFilter();
     applyFilter();
-    document.getElementById("stat-rows").textContent = allData.length;
-    document.getElementById("stat-cols").textContent = headers.length;
+    calculateAndRenderStats();
     document.getElementById("last-sync").textContent =
       "Synced " + new Date().toLocaleTimeString();
   } catch (e) {
@@ -346,11 +378,51 @@ async function fetchData() {
   }
 }
 
+function onDateRangeChange() {
+    applyFilter(); // Re-filter the main table
+    calculateAndRenderStats(); // Re-calculate the stats
+}
+
+function calculateAndRenderStats() {
+    const startDateStr = document.getElementById("start-date-filter").value;
+    const endDateStr = document.getElementById("end-date-filter").value;
+
+    if (!startDateStr || !endDateStr) return;
+
+    const startDate = new Date(startDateStr);
+    const endDate = new Date(endDateStr);
+    endDate.setHours(23, 59, 59, 999); // Include the whole end day
+
+    const rangeData = allData.filter(row => {
+        const rowDate = new Date(row.Date);
+        return row.Date && rowDate >= startDate && rowDate <= endDate;
+    });
+
+    const daysInRange = (endDate - startDate) / (1000 * 60 * 60 * 24) + 1;
+    const totalCalls = rangeData.length;
+    const doneCalls = rangeData.filter(r => r.Status === 'Done').length;
+    const closeCalls = rangeData.filter(r => r.Status === 'Close').length;
+    const notRelatedCalls = rangeData.filter(r => r.Status === 'not related calls').length;
+    const issuesCalls = rangeData.filter(r => r.Status === 'Issues').length;
+    const trainingCalls = rangeData.filter(r => r.Status === 'Training').length;
+
+    document.getElementById('stat-total-calls').textContent = totalCalls;
+    document.getElementById('stat-avg-total-calls').textContent = (totalCalls / daysInRange).toFixed(1);
+    document.getElementById('stat-done-calls').textContent = doneCalls;
+    document.getElementById('stat-avg-done-calls').textContent = (doneCalls / daysInRange).toFixed(1);
+    document.getElementById('stat-close-calls').textContent = closeCalls;
+    document.getElementById('stat-not-related-calls').textContent = notRelatedCalls;
+    document.getElementById('stat-issues-calls').textContent = issuesCalls;
+    document.getElementById('stat-training-calls').textContent = trainingCalls;
+}
+
 // ── Filter & Sort ─────────────────────────────────────────
 
 function applyFilter() {
   const q   = document.getElementById("search-input").value.toLowerCase();
   const col = document.getElementById("col-filter").value;
+  // Note: The main table is not filtered by date in this version, only the stats are.
+  // You could add date filtering here if needed for the main table.
   filtered = allData.filter(row => {
     const target = col ? String(row[col]) : Object.values(row).join(" ");
     return target.toLowerCase().includes(q);
@@ -365,7 +437,7 @@ function applyFilter() {
     });
   }
   currentPage = 1;
-  document.getElementById("stat-filtered").textContent = filtered.length;
+  // The "filtered" stat box was removed, so this line is no longer needed.
   renderTable();
 }
 
@@ -552,6 +624,7 @@ function toast(msg, type) {
 
 // Close modal on overlay click
 document.getElementById("modal-overlay").addEventListener("click", e => {
+  // Close modal only if the dark overlay itself is clicked, not the modal content.
   if (e.target === e.currentTarget) closeModal();
 });
 </script>
