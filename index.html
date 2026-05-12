@@ -362,11 +362,7 @@
 
   <!-- Table -->
   <div class="table-wrap">
-    <div id="table-container">
-      <div class="state-msg">
-        <div>Enter your API URL above and click <strong>Connect</strong></div>
-      </div>
-    </div>
+    <div id="table-container"></div>
   </div>
 
   <div class="pagination" id="pagination"></div>
@@ -638,7 +634,11 @@ function updateChart(chartId, data, type = 'line', options = {}) {
 function renderTable() {
   const start = (currentPage - 1) * PAGE_SIZE;
   const page  = filtered.slice(start, start + PAGE_SIZE);
-  if (!headers.length) { setLoading(false); return; }
+  if (!allData.length) {
+    document.getElementById("table-container").innerHTML = `<div class="state-msg">No data found in the connected sheet.</div>`;
+    setLoading(false);
+    return;
+  }
   const tableHTML = `
     <table>
       <thead><tr>
@@ -816,7 +816,7 @@ function formatCell(val) {
 }
 
 function setLoading(on) {
-  if (!on) return;
+  if (!on) { document.getElementById("table-container").innerHTML = ""; return; }
   document.getElementById("table-container").innerHTML =
     `<div class="state-msg"><div class="spinner"></div>Loading…</div>`;
 }
