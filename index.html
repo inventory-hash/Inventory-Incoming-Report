@@ -400,11 +400,11 @@ function calculateAndRenderStats() {
 
     const daysInRange = (endDate - startDate) / (1000 * 60 * 60 * 24) + 1;
     const totalCalls = rangeData.length;
-    const doneCalls = rangeData.filter(r => r.Status === 'Done').length;
-    const closeCalls = rangeData.filter(r => r.Status === 'Close').length;
-    const notRelatedCalls = rangeData.filter(r => r.Status === 'not related calls').length;
-    const issuesCalls = rangeData.filter(r => r.Status === 'Issues').length;
-    const trainingCalls = rangeData.filter(r => r.Status === 'Training').length;
+    const doneCalls = rangeData.filter(r => r.Status1 === 'Done').length;
+    const closeCalls = rangeData.filter(r => r.Status1 === 'Close').length;
+    const notRelatedCalls = rangeData.filter(r => r.Status1 === 'not related calls').length;
+    const issuesCalls = rangeData.filter(r => r.Status1 === 'Issues').length;
+    const trainingCalls = rangeData.filter(r => r.Status1 === 'Training').length;
 
     document.getElementById('stat-total-calls').textContent = totalCalls;
     document.getElementById('stat-avg-total-calls').textContent = (totalCalls / daysInRange).toFixed(1);
