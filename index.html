@@ -136,11 +136,13 @@
 
   /* ── Charts ── */
   .charts-grid { display:grid; grid-template-columns: repeat(12, 1fr); gap: 1.5rem; }
+  .chart-container { position: relative; height: 280px; }
   .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
   .chart-card h3 { font-size: .8rem; font-family: var(--mono); color: var(--muted); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: .06em; }
   .chart-card.col-span-6 { grid-column: span 12; }
   .chart-card.col-span-4 { grid-column: span 12; } /* Adjusted for smaller screens */
   .chart-card.col-span-8 { grid-column: span 12; }
+  .chart-card.col-span-12 { grid-column: span 12; }
   @media (min-width: 1024px) {
     .chart-card.col-span-6 { grid-column: span 6; }
     .chart-card.col-span-4 { grid-column: span 4; }
@@ -296,7 +298,7 @@
     <div class="stat-card">
       <div class="stat-label">Done Calls</div>
       <div class="stat-value c-green" id="stat-done-calls">—</div>
-      <div class="stat-sub" id="stat-done-percentage"></div>
+      <div class="stat-sub" id="stat-done-percentage">&nbsp;</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Pending Calls</div>
@@ -342,16 +344,16 @@
   <!-- Charts -->
   <div class="charts-grid">
     <div class="chart-card col-span-8">
-      <h3>Daily Call Trend</h3> <div class="chart-container"><canvas id="dailyTrend"></canvas></div>
+      <h3>Daily Call Trend</h3><div class="chart-container"><canvas id="dailyTrend"></canvas></div>
     </div>
     <div class="chart-card col-span-4">
-      <h3>Status Distribution</h3> <div class="chart-container"><canvas id="statusPie"></canvas></div>
+      <h3>Status Distribution</h3><div class="chart-container"><canvas id="statusPie"></canvas></div>
     </div>
     <div class="chart-card col-span-6">
-      <h3>Agent-wise Call Count</h3> <div class="chart-container"><canvas id="agentCount"></canvas></div>
+      <h3>Agent-wise Call Count</h3><div class="chart-container"><canvas id="agentCount"></canvas></div>
     </div>
     <div class="chart-card col-span-6">
-      <h3>Done vs Pending by Agent</h3> <div class="chart-container"><canvas id="doneVsPending"></canvas></div>
+      <h3>Done vs Pending by Agent</h3><div class="chart-container"><canvas id="doneVsPending"></canvas></div>
     </div>
     <div class="chart-card col-span-12">
       <h3>Hour-wise Call Distribution</h3> <div class="chart-container" style="height: 240px;"><canvas id="hourDistribution"></canvas></div>
@@ -386,7 +388,7 @@
 <div id="toast"></div>
 
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbz46hQW9QxRqnVYUdLg3BrLzn7KAKTzUM10TqE3iYZWZ-NOeknNglkxV851YkRSakE5vg/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbzuu5lIavQc77WG2-4hwEbpppsG9fRPGrXVCAOlkZU0h-Njh6l9jSfSg4HmEqQkdHSJ/exec";
 let allData   = [];
 let headers   = [];
 let filtered  = [];
@@ -503,7 +505,6 @@ function calculateAndRenderStats(data) { // This function receives the date-filt
     const closeCalls = data.filter(r => r.Status1 === 'Close').length;
     const pendingCalls = data.filter(r => r.Status1 === 'Pending').length;
 
-    const uniqueDates = new Set(data.map(r => r.Date).filter(Boolean));
     // Active days are unique dates with calls within the date range.
     const uniqueDates = new Set(data.map(r => r.Date.split(' ')[0]).filter(Boolean));
     const activeDays = uniqueDates.size > 0 ? uniqueDates.size : 1;
@@ -511,7 +512,7 @@ function calculateAndRenderStats(data) { // This function receives the date-filt
     document.getElementById('stat-total-calls').textContent = totalCalls;
     document.getElementById('stat-done-calls').textContent = doneCalls;
     document.getElementById('stat-pending-calls').textContent = pendingCalls;
-    document.getElementById('stat-closed-calls').textContent = closeCalls; // Corrected ID
+    document.getElementById('stat-closed-calls').textContent = closeCalls;
     document.getElementById('stat-active-days').textContent = uniqueDates.size;
     document.getElementById('stat-done-percentage').textContent = totalCalls > 0 ? `${((doneCalls / totalCalls) * 100).toFixed(1)}%` : '0%';
     document.getElementById('stat-avg-calls').textContent = (totalCalls / activeDays).toFixed(1);
@@ -608,20 +609,18 @@ function renderCharts(data) {
             }
         }
     });
-    updateChart('hourDistribution', { labels: Array.from({ length: 24 }, (_, i) => `${i}:00`), datasets: [{ label: 'Calls', data: hourCounts, backgroundColor: 'rgba(247, 161, 78, 0.6)' }] }, 'bar');
     updateChart('hourDistribution', { labels: Array.from({ length: 24 }, (_, i) => `${i}:00`), datasets: [{ label: 'Calls', data: hourCounts, backgroundColor: 'rgba(247, 161, 78, 0.6)' }] }, 'bar', { scales: { x: { ticks: { maxRotation: 0, minRotation: 0 } } } });
 }
 
-function updateChart(chartId, data, type = 'line', options = {}) { // Removed duplicate function
+function updateChart(chartId, data, type = 'line', options = {}) {
     const ctx = document.getElementById(chartId)?.getContext('2d');
     if (!ctx) return;
     if (charts[chartId]) {
         charts[chartId].data = data;
+        charts[chartId].options = { ...charts[chartId].options, ...options };
         charts[chartId].update();
     } else {
         charts[chartId] = new Chart(ctx, {
-            type: type,
-            data: data,
             type,
             data,
             options: {
