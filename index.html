@@ -1,263 +1,859 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
+<meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Inventory Team Incoming Calls Report</title>
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  :root {
+    --bg:        #0e0e10;
+    --surface:   #17171a;
+    --card:      #1e1e22;
+    --border:    #2e2e34;
+    --accent:    #5c8df8; /* Blue for Total */
+    --accent:    #7c6ef7;
+    --accent2:   #3ecf8e;
+    --green:     #3ecf8e;
+    --accent3:   #f7a14e;
+    --text:      #e8e8ec;
+    --muted:     #8a8a96;
+    --danger:    #f06060;
+    --mono:      'DM Mono', monospace;
+    --sans:      'Syne', sans-serif;
+  }
+
   body {
-    background: #f0f4f8;
-    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
     min-height: 100vh;
-    padding: 24px;
-    color: #333;
+    padding: 0;
   }
 
-  .report-wrapper {
-    max-width: 1100px;
-    margin: 0 auto;
-    background: #fff;
-    border-radius: 18px;
-    border: 2px solid #a8dde9;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-    overflow: hidden;
-  }
-
-  /* ── Title Bar ── */
-  .report-title {
-    background: linear-gradient(90deg, #b2eaf5 0%, #c8f0f8 50%, #b2eaf5 100%);
-    border-bottom: 2px solid #a8dde9;
-    text-align: center;
-    padding: 14px 20px;
-  }
-  .report-title h1 {
-    font-size: 1.2rem;
-    font-weight: 800;
-    color: #1a7a96;
-    letter-spacing: .01em;
-  }
-
-  /* ── Filter Row ── */
-  .filter-row {
+  /* ── Header ── */
+  header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 14px 20px;
-    border-bottom: 1px solid #daeef5;
-    flex-wrap: wrap;
-    background: #fff;
+    justify-content: space-between;
+    padding: 1.25rem 2rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 100;
   }
-  .filter-dropdown {
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 1.1rem; font-weight: 700; letter-spacing: -.02em;
+  }
+  .logo-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 12px var(--accent);
+  }
+  .header-meta { font-size: .75rem; font-family: var(--mono); color: var(--muted); }
+  .btn {
+    background: var(--accent); color: #fff; border: none;
+    padding: .5rem 1.1rem; border-radius: 6px; font-family: var(--sans);
+    font-size: .82rem; font-weight: 600; cursor: pointer;
+    transition: opacity .15s;
+  }
+  .btn:hover { opacity: .85; }
+  .btn.secondary {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .btn.secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.danger { background: var(--danger); }
+
+  .header-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
-    border: 1.5px solid #b0cdd8;
-    border-radius: 20px;
-    padding: 6px 14px;
-    font-family: 'Nunito', sans-serif;
-    font-size: .85rem;
-    font-weight: 600;
-    color: #444;
-    background: #fff;
-    cursor: pointer;
-    outline: none;
-    appearance: none;
-    min-width: 120px;
+    gap: .75rem;
   }
-  .filter-btn {
-    display: flex; align-items: center; gap: 6px;
-    border: 1.5px solid #b0cdd8; border-radius: 20px;
-    padding: 6px 16px; font-family: 'Nunito', sans-serif;
-    font-size: .85rem; font-weight: 600; color: #444;
-    background: #fff; cursor: pointer;
-    white-space: nowrap;
+  .date-filter-group { display: flex; align-items: center; gap: .5rem; }
+  .date-filter-group .search-box {
+    padding: .4rem .7rem;
+    font-size: .8rem;
   }
-  .filter-btn .arrow { font-size: .7rem; color: #999; margin-left: 4px; }
-  .filter-btn:hover { border-color: #5bbfd4; color: #1a7a96; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
 
-  /* ── Stats Section ── */
-  .stats-section {
-    border: 2px solid #a8dde9;
-    border-radius: 14px;
-    margin: 14px 16px 16px;
-    padding: 14px 12px;
-    background: #fff;
+  /* ── Setup Banner ── */
+  #setup-banner {
+    background: linear-gradient(90deg, #1a1540 0%, #191f2a 100%);
+    border-bottom: 1px solid #2e2e55;
+    padding: 1.25rem 2rem;
+    display: flex; align-items: flex-start; gap: 1rem;
   }
-  .stats-grid {
+  #setup-banner.hidden { display: none; }
+  .setup-icon { font-size: 1.5rem; margin-top: 2px; }
+  .setup-content h3 { font-size: .95rem; font-weight: 600; color: #aca8ff; margin-bottom: .4rem; }
+  .setup-content p  { font-size: .8rem; color: var(--muted); line-height: 1.6; }
+  .setup-url-row { display: flex; gap: 8px; margin-top: .75rem; }
+  #api-url-input {
+    flex: 1; background: #0e0e18; border: 1px solid #3a3a60;
+    color: var(--text); padding: .45rem .75rem; border-radius: 6px;
+    font-family: var(--mono); font-size: .8rem; outline: none;
+  }
+  #api-url-input:focus { border-color: var(--accent); }
+
+  /* ── Main Layout ── */
+  main { padding: 2rem; }
+
+  /* ── Stats Row ── */
+  .stats-row {
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem; margin-bottom: 2rem;
   }
-  @media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(4, 1fr); } }
-  @media (max-width: 500px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
-
-  /* ── Stat Card ── */
   .stat-card {
-    border: 1.5px solid #a8dde9;
-    border-radius: 12px;
-    padding: 10px 10px 8px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    background: #fff;
-    position: relative;
-    min-width: 0;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.25rem;
+    display: flex; flex-direction: column; gap: .3rem;
   }
-  .stat-label {
-    font-size: .68rem;
-    font-weight: 700;
-    color: #2aaac8;
-    margin-bottom: 4px;
-    line-height: 1.2;
-    white-space: nowrap;
+  .stat-label { font-size: .7rem; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .stat-value { font-size: 1.9rem; font-weight: 700; line-height: 1; }
+  .stat-sub   { font-size: .72rem; color: var(--muted); }
+  .c-accent  { color: var(--accent); }
+  .c-green   { color: var(--accent2); }
+  .c-red     { color: var(--danger); }
+  .c-amber   { color: var(--accent3); }
+
+  /* ── Status Pills ── */
+  .status-pills { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:2rem; }
+  .status-pill {
+    display:flex; align-items:center; gap:6px;
+    background:var(--card); border:1px solid var(--border);
+    border-radius:20px; padding:.3rem .85rem;
+    font-size:.75rem; font-family:var(--mono);
+    cursor:pointer; transition:all .15s; user-select:none;
   }
-  .stat-value {
-    font-size: 1.65rem;
-    font-weight: 800;
-    color: #222;
-    line-height: 1;
-    margin-bottom: 2px;
+  .status-pill:hover { border-color:var(--accent); }
+  .status-pill.active { border-color:var(--accent); background:rgba(124,110,247,.12); }
+  .pill-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .pill-count { font-weight:700; }
+
+  /* ── Charts ── */
+  .charts-grid { display:grid; grid-template-columns: repeat(12, 1fr); gap: 1.5rem; }
+  .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  .chart-card h3 { font-size: .8rem; font-family: var(--mono); color: var(--muted); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: .06em; }
+  .chart-card.col-span-6 { grid-column: span 12; }
+  .chart-card.col-span-4 { grid-column: span 12; } /* Adjusted for smaller screens */
+  .chart-card.col-span-8 { grid-column: span 12; }
+  @media (min-width: 1024px) {
+    .chart-card.col-span-6 { grid-column: span 6; }
+    .chart-card.col-span-4 { grid-column: span 4; }
+    .chart-card.col-span-8 { grid-column: span 8; }
+    .chart-card.col-span-12 { grid-column: span 12; }
   }
-  .stat-pct {
-    font-size: .75rem;
-    font-weight: 700;
-    color: #e63030;
-    margin-bottom: 6px;
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: flex; gap: .75rem; align-items: center;
+    margin-bottom: 1.25rem; flex-wrap: wrap;
   }
-  .stat-bar-wrap {
-    width: 100%;
-    height: 6px;
-    background: #e0e0e0;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 4px;
+  .search-box {
+    flex: 1; min-width: 200px;
+    background: var(--card); border: 1px solid var(--border);
+    color: var(--text); padding: .5rem .9rem; border-radius: 6px;
+    font-family: var(--sans); font-size: .85rem; outline: none;
   }
-  .stat-bar-fill {
-    height: 100%;
-    border-radius: 4px;
-    background: #e63030;
-    transition: width .6s ease;
+  .search-box:focus { border-color: var(--accent); }
+  .search-box::placeholder { color: var(--muted); }
+
+  /* ── Table ── */
+  .table-wrap {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
   }
-  .stat-total {
-    font-size: .62rem;
-    color: #aaa;
-    font-weight: 600;
-    align-self: flex-end;
-    margin-top: 1px;
+  table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  thead th {
+    background: var(--surface); padding: .75rem 1rem;
+    text-align: left; font-weight: 600; font-family: var(--mono);
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none; white-space: nowrap;
   }
+  thead th:hover { color: var(--text); }
+  thead th .sort-icon { margin-left: 4px; opacity: .4; }
+  thead th.active .sort-icon { opacity: 1; color: var(--accent); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(124, 110, 247, .05); }
+  tbody td { padding: .7rem 1rem; color: var(--text); word-break: break-word; }
+  .cell-pill {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 4px; font-family: var(--mono); font-size: .75rem;
+  }
+  .row-num { color: var(--muted); font-family: var(--mono); font-size: .72rem; }
+  .action-cell { display: flex; gap: 6px; }
+  .icon-btn {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); padding: 3px 8px; border-radius: 5px;
+    font-size: .75rem; cursor: pointer; transition: all .15s;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .icon-btn.del:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* ── Empty / Loading ── */
+  .state-msg {
+    text-align: center; padding: 3rem 2rem;
+    color: var(--muted); font-size: .9rem;
+  }
+  .spinner {
+    width: 32px; height: 32px; border: 3px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin .7s linear infinite; margin: 0 auto 1rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Modal ── */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 500; opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  .overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 1.75rem; width: 480px; max-width: 95vw;
+    max-height: 80vh; overflow-y: auto;
+  }
+  .modal h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1.25rem; }
+  .form-row { margin-bottom: 1rem; }
+  .form-row label { display: block; font-size: .75rem; font-family: var(--mono); color: var(--muted); margin-bottom: .3rem; }
+  .form-row input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: .5rem .75rem; border-radius: 6px;
+    font-size: .85rem; font-family: var(--sans); outline: none;
+  }
+  .form-row input:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; gap: .75rem; margin-top: 1.5rem; justify-content: flex-end; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 999;
+    background: var(--card); border: 1px solid var(--border);
+    padding: .7rem 1.1rem; border-radius: 8px; font-size: .82rem;
+    transition: opacity .3s; opacity: 0; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+  #toast.ok   { border-left: 3px solid var(--accent2); }
+  #toast.err  { border-left: 3px solid var(--danger); }
+
+  .pagination { display: flex; gap: .5rem; align-items: center; margin-top: 1.25rem; justify-content: center; }
+  .page-btn   { background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: .35rem .75rem; border-radius: 5px; cursor: pointer; font-size: .82rem; }
+  .page-btn:hover, .page-btn.active { border-color: var(--accent); color: var(--accent); }
+  .page-btn:disabled { opacity: .4; cursor: default; }
 </style>
 </head>
 <body>
 
-<div class="report-wrapper">
-
-  <!-- Title -->
-  <div class="report-title">
-    <h1>Inventory Team Incoming Calls Report</h1>
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    Inventory Team Incoming Calls Report
   </div>
-
-  <!-- Filters -->
-  <div class="filter-row">
-    <button class="filter-btn">RID <span class="arrow">▾</span></button>
-    <button class="filter-btn">Agent Name <span class="arrow">▾</span></button>
-    <button class="filter-btn">Call Related To <span class="arrow">▾</span></button>
-    <button class="filter-btn" id="date-range-btn">May 1, 2026 - May 12, 2026 <span class="arrow">▾</span></button>
+  <div class="header-meta" id="last-sync">Not synced yet</div>
+  <div class="header-actions">
+    <div class="date-filter-group">
+      <label for="start-date-filter" class="sr-only">Start Date</label>
+      <input type="date" id="start-date-filter" class="search-box" onchange="onDateRangeChange()" style="flex:0;min-width:160px;">
+      <span style="color:var(--muted)">-</span>
+      <label for="end-date-filter" class="sr-only">End Date</label>
+      <input type="date" id="end-date-filter" class="search-box" onchange="onDateRangeChange()" style="flex:0;min-width:160px;">
+    </div>
+    <div style="width:1px; height: 24px; background: var(--border);"></div>
+    <button class="btn secondary" onclick="openAddModal()">+ Add Row</button>
+    <button class="btn" onclick="fetchData()">↻ Refresh</button>
   </div>
+</header>
 
-  <!-- Stats Cards -->
-  <div class="stats-section">
-    <div class="stats-grid" id="stats-grid">
+<!-- Setup Banner -->
+<div id="setup-banner">
+  <div class="setup-icon">🔗</div>
+  <div class="setup-content">
+    <h3>Connect your Google Sheet</h3>
+    <p>Paste your Apps Script Web App URL below. Deploy it via <strong>Extensions → Apps Script → Deploy → New deployment → Web App</strong>.<br>Set <em>Execute as: Me</em> and <em>Who has access: Anyone</em>.</p>
+    <div class="setup-url-row">
+      <input id="api-url-input" placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec" />
+      <button class="btn" onclick="saveApiUrl()">Connect</button>
+    </div>
+  </div>
+</div>
 
-      <div class="stat-card">
-        <div class="stat-label">Total Calls</div>
-        <div class="stat-value">5,688</div>
-        <div class="stat-pct">78.3%</div>
-        <div class="stat-bar-wrap"><div class="stat-bar-fill" style="width:78.3%"></div></div>
-        <div class="stat-total">7,262</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">Avg Total Calls</div>
-        <div class="stat-value">474</div>
-        <div class="stat-pct">78.3%</div>
-        <div class="stat-bar-wrap"><div class="stat-bar-fill" style="width:78.3%"></div></div>
-        <div class="stat-total">605</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">Done Calls</div>
-        <div class="stat-value">3,574</div>
-        <div class="stat-pct">82.5%</div>
-        <div class="stat-bar-wrap"><div class="stat-bar-fill" style="width:82.5%"></div></div>
-        <div class="stat-total">4,334</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">Avg Done Calls</div>
-        <div class="stat-value">298</div>
-        <div class="stat-pct">82.5%</div>
-        <div class="stat-bar-wrap"><div class="stat-bar-fill" style="width:82.5%"></div></div>
-        <div class="stat-total">361</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">Close Calls</div>
-        <div class="stat-value">1,344</div>
-        <div class="stat-pct">71.3%</div>
-        <div class="stat-bar-wrap"><div class="stat-bar-fill" style="width:71.3%"></div></div>
-        <div class="stat-total">1,886</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">Not Related Calls</div>
-        <div class="stat-value">560</div>
-        <div class="stat-pct">79.3%</div>
-        <div class="stat-bar-wrap"><div class="stat-bar-fill" style="width:79.3%"></div></div>
-        <div class="stat-total">706</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">Total Issues</div>
-        <div class="stat-value">3,481</div>
-        <div class="stat-pct">84.9%</div>
-        <div class="stat-bar-wrap"><div class="stat-bar-fill" style="width:84.9%"></div></div>
-        <div class="stat-total">4,099</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">Total Training</div>
-        <div class="stat-value">571</div>
-        <div class="stat-pct">72.5%</div>
-        <div class="stat-bar-wrap"><div class="stat-bar-fill" style="width:72.5%"></div></div>
-        <div class="stat-total">788</div>
-      </div>
-
+<!-- Main -->
+<main>
+  <!-- Stats -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card" style="grid-column: span 2;">
+      <div class="stat-label">Total Calls</div>
+      <div class="stat-value c-accent" id="stat-total-calls">—</div>
+      <div class="stat-sub">For selected period</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Done Calls</div>
+      <div class="stat-value c-green" id="stat-done-calls">—</div>
+      <div class="stat-sub" id="stat-done-percentage"></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pending Calls</div>
+      <div class="stat-value c-red" id="stat-pending-calls">—</div>
+      <div class="stat-sub"></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Closed Calls</div>
+      <div class="stat-value c-amber" id="stat-closed-calls">—</div>
+      <div class="stat-sub">Status: "Close"</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Calls/Day</div>
+      <div class="stat-value" id="stat-avg-calls">—</div>
+      <div class="stat-sub">Based on active days</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Done/Day</div>
+      <div class="stat-value" id="stat-avg-done-calls">—</div>
+      <div class="stat-sub">Based on active days</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active Days</div>
+      <div class="stat-value" id="stat-active-days">—</div>
+      <div class="stat-sub">Days with calls</div>
     </div>
   </div>
 
+  <!-- Status Pills -->
+  <div class="status-pills" id="status-pills"></div>
+
+  <!-- Toolbar -->
+  <div class="toolbar" style="margin-top: 2rem;">
+    <input class="search-box" id="search-input" placeholder="Search across all columns…" oninput="applyFilter()" />
+    <select class="search-box" id="agent-filter" style="flex:0;min-width:160px;" onchange="onFilterChange()"></select>
+    <select class="search-box" id="interaction-filter" style="flex:0;min-width:160px;" onchange="onFilterChange()"></select>
+    <select class="search-box" id="col-filter" style="flex:0;min-width:140px;" onchange="applyFilter()">
+      <option value="">All columns</option>
+    </select>
+    <button class="btn secondary" onclick="exportCSV()">⬇ Export CSV</button>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-grid">
+    <div class="chart-card col-span-8">
+      <h3>Daily Call Trend</h3> <div class="chart-container"><canvas id="dailyTrend"></canvas></div>
+    </div>
+    <div class="chart-card col-span-4">
+      <h3>Status Distribution</h3> <div class="chart-container"><canvas id="statusPie"></canvas></div>
+    </div>
+    <div class="chart-card col-span-6">
+      <h3>Agent-wise Call Count</h3> <div class="chart-container"><canvas id="agentCount"></canvas></div>
+    </div>
+    <div class="chart-card col-span-6">
+      <h3>Done vs Pending by Agent</h3> <div class="chart-container"><canvas id="doneVsPending"></canvas></div>
+    </div>
+    <div class="chart-card col-span-12">
+      <h3>Hour-wise Call Distribution</h3> <div class="chart-container" style="height: 240px;"><canvas id="hourDistribution"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <div id="table-container">
+      <div class="state-msg">
+        <div>Enter your API URL above and click <strong>Connect</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pagination" id="pagination"></div>
+</main>
+
+<!-- Add/Edit Modal -->
+<div class="overlay" id="modal-overlay">
+  <div class="modal">
+    <h2 id="modal-title">Add Row</h2>
+    <div id="modal-form"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" id="modal-save-btn" onclick="saveModal()">Save</button>
+    </div>
+  </div>
 </div>
 
-<script>
-  // ── Live date range label ─────────────────────────────────
-  function formatDateRange(d1, d2) {
-    const opts = { month: 'short', day: 'numeric', year: 'numeric' };
-    return d1.toLocaleDateString('en-US', opts) + ' - ' + d2.toLocaleDateString('en-US', opts);
-  }
-  // Set to today's range (first of month → today)
-  const today = new Date();
-  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  document.getElementById('date-range-btn').childNodes[0].textContent =
-    formatDateRange(firstOfMonth, today) + ' ';
+<!-- Toast -->
+<div id="toast"></div>
 
-  // ── Animate bars on load ──────────────────────────────────
-  document.querySelectorAll('.stat-bar-fill').forEach(bar => {
-    const target = bar.style.width;
-    bar.style.width = '0%';
-    setTimeout(() => bar.style.width = target, 100);
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbz46hQW9QxRqnVYUdLg3BrLzn7KAKTzUM10TqE3iYZWZ-NOeknNglkxV851YkRSakE5vg/exec";
+let allData   = [];
+let headers   = [];
+let filtered  = [];
+let sortCol   = "";
+let sortAsc   = true;
+let currentPage = 1;
+const PAGE_SIZE = 20;
+let editRowIndex = null;
+let activeStatus = "";
+let activeAgent = "";
+let activeInteraction = "";
+const charts = {};
+
+// ── Bootstrap ─────────────────────────────────────────────
+document.getElementById("setup-banner").classList.add("hidden");
+const now = new Date();
+const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+document.getElementById('start-date-filter').value = startDate.toISOString().split('T')[0];
+document.getElementById('end-date-filter').value = endDate.toISOString().split('T')[0];
+
+fetchData();
+setInterval(fetchData, 5 * 60 * 1000); // Auto-refresh every 5 minutes
+
+// ── Fetch ─────────────────────────────────────────────────
+
+async function fetchData() {
+  if (!API_URL) return;
+  setLoading(true);
+  try {
+    const res  = await fetch(API_URL, { redirect: "follow" });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error);
+    allData = json.data;
+    headers = allData.length ? Object.keys(allData[0]) : [];
+    buildColFilter();
+    applyFilter();
+    document.getElementById("last-sync").textContent =
+      "Synced " + new Date().toLocaleTimeString();
+  } catch (e) {
+    setError("Failed to fetch data: " + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function onDateRangeChange() {
+    applyFilter(); // Re-filter the main table
+}
+
+function onFilterChange() {
+    applyFilter();
+}
+
+function getRangeData() {
+    const startDateStr = document.getElementById("start-date-filter").value;
+    const endDateStr = document.getElementById("end-date-filter").value;
+
+    if (!startDateStr || !endDateStr) return [];
+
+    const startDate = new Date(startDateStr);
+    const endDate = new Date(endDateStr);
+    endDate.setHours(23, 59, 59, 999); // Include the whole end day
+
+    return allData.filter(row => {
+        const rowDate = parseDate(row.Date);
+        return row.Date && rowDate >= startDate && rowDate <= endDate;
+    });
+}
+
+// ── Filter & Sort ─────────────────────────────────────────
+
+function applyFilter() {
+  const q   = document.getElementById("search-input").value.toLowerCase();
+  const col = document.getElementById("col-filter").value;
+  activeAgent = document.getElementById("agent-filter") ? document.getElementById("agent-filter").value : "";
+  activeInteraction = document.getElementById("interaction-filter") ? document.getElementById("interaction-filter").value : "";
+
+  const dateFilteredData = getRangeData(); // 1. Filter by date first
+  
+  // Update overview stats based on the date-filtered data (KPIs at the top)
+  calculateAndRenderStats(dateFilteredData); 
+  buildStatusPills(dateFilteredData); // Pills should show counts before other filters
+  buildDynamicFilters(dateFilteredData); // Filters should show all options for the date range
+
+  filtered = dateFilteredData.filter(row => { // 2. Apply other filters
+    const statusOk = activeStatus === "" || (String(row.Status1 || "")).trim() === activeStatus;
+    const agentOk = activeAgent === "" || (row['Agent Name'] || "") === activeAgent;
+    const interactionOk = activeInteraction === "" || (row['Interaction Type'] || "") === activeInteraction;
+    // Search query check
+    const target = col ? String(row[col]) : Object.values(row).join(" ");
+    const searchOk = target.toLowerCase().includes(q);
+    return statusOk && agentOk && interactionOk && searchOk;
   });
+  
+  renderCharts(filtered); // Charts show data respecting all filters
+
+  if (sortCol) {
+    filtered.sort((a, b) => {
+      const va = a[sortCol], vb = b[sortCol];
+      const cmp = isNaN(va) || isNaN(vb)
+        ? String(va).localeCompare(String(vb))
+        : Number(va) - Number(vb);
+      return sortAsc ? cmp : -cmp;
+    });
+  }
+  currentPage = 1;
+  renderTable();
+}
+
+function calculateAndRenderStats(data) { // This function receives the date-filtered data
+    const totalCalls = data.length;
+    const doneCalls = data.filter(r => String(r.Status1 || "").trim() === 'Done').length;
+    const closeCalls = data.filter(r => r.Status1 === 'Close').length;
+    const pendingCalls = data.filter(r => r.Status1 === 'Pending').length;
+
+    const uniqueDates = new Set(data.map(r => r.Date).filter(Boolean));
+    // Active days are unique dates with calls within the date range.
+    const uniqueDates = new Set(data.map(r => r.Date.split(' ')[0]).filter(Boolean));
+    const activeDays = uniqueDates.size > 0 ? uniqueDates.size : 1;
+
+    document.getElementById('stat-total-calls').textContent = totalCalls;
+    document.getElementById('stat-done-calls').textContent = doneCalls;
+    document.getElementById('stat-pending-calls').textContent = pendingCalls;
+    document.getElementById('stat-closed-calls').textContent = closeCalls; // Corrected ID
+    document.getElementById('stat-active-days').textContent = uniqueDates.size;
+    document.getElementById('stat-done-percentage').textContent = totalCalls > 0 ? `${((doneCalls / totalCalls) * 100).toFixed(1)}%` : '0%';
+    document.getElementById('stat-avg-calls').textContent = (totalCalls / activeDays).toFixed(1);
+    document.getElementById('stat-avg-done-calls').textContent = (doneCalls / activeDays).toFixed(1);
+}
+
+function buildStatusPills(data) {
+  const counts = {};
+  data.forEach(row => {
+    const s = String(row.Status1 || "").trim();
+    counts[s] = (counts[s] || 0) + 1;
+  });
+  const container = document.getElementById("status-pills");
+  const allPill = `<div class="status-pill${activeStatus === '' ? ' active' : ''}" onclick="setStatusFilter('')">
+    <span class="pill-dot" style="background:var(--muted)"></span>All <span class="pill-count">${data.length}</span></div>`;
+  const pills = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([s, c]) => {
+    const color = s === 'Done' ? 'var(--green)' : s === 'Pending' ? 'var(--danger)' : 'var(--accent3)';
+    return `<div class="status-pill${activeStatus === s ? ' active' : ''}" onclick="setStatusFilter('${esc(s)}')">
+      <span class="pill-dot" style="background:${color}"></span>${esc(s)} <span class="pill-count">${c}</span></div>`;
+  }).join("");
+  container.innerHTML = allPill + pills;
+}
+
+function setStatusFilter(s) {
+    activeStatus = s;
+    applyFilter();
+}
+
+function buildDynamicFilters(data) {
+    const agentFilter = document.getElementById("agent-filter");
+    const interactionFilter = document.getElementById("interaction-filter");
+
+    const agents = [...new Set(data.map(r => r['Agent Name']).filter(Boolean))].sort();
+    const interactions = [...new Set(data.map(r => r['Interaction Type']).filter(Boolean))].sort();
+
+    agentFilter.innerHTML = `<option value="">All Agents</option>` + agents.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+    interactionFilter.innerHTML = `<option value="">All Interactions</option>` + interactions.map(i => `<option value="${esc(i)}">${esc(i)}</option>`).join('');
+
+    agentFilter.value = activeAgent;
+    interactionFilter.value = activeInteraction;
+}
+
+function renderCharts(data) {
+    // 1. Daily Call Trend
+    const dailyCounts = data.reduce((acc, row) => {
+        if (row.Date) { const d = String(row.Date).split(' ')[0]; acc[d] = (acc[d] || 0) + 1; }
+        return acc;
+    }, {});
+    const sortedDaily = Object.entries(dailyCounts).sort((a, b) => parseDate(a[0]) - parseDate(b[0]));
+    updateChart('dailyTrend', { labels: sortedDaily.map(d => d[0]), datasets: [{ label: 'Total Calls', data: sortedDaily.map(d => d[1]), borderColor: 'var(--accent)', tension: 0.1, pointBackgroundColor: 'var(--accent)' }] });
+
+    // 2. Status-wise Pie Chart
+    const statusCounts = data.reduce((acc, row) => {
+        const s = row.Status1 || 'N/A';
+        acc[s] = (acc[s] || 0) + 1;
+        return acc;
+    }, {});
+    updateChart('statusPie', { labels: Object.keys(statusCounts), datasets: [{ data: Object.values(statusCounts), backgroundColor: Object.keys(statusCounts).map(s => s === 'Done' ? 'var(--green)' : s === 'Pending' ? 'var(--danger)' : '#f7a14e') }] }, 'doughnut');
+
+    // 3. Agent-wise Call Count
+    const agentCounts = data.reduce((acc, row) => {
+        const agent = row['Agent Name'] || 'Unassigned';
+        acc[agent] = (acc[agent] || 0) + 1;
+        return acc;
+    }, {});
+    const sortedAgents = Object.entries(agentCounts).sort((a, b) => b[1] - a[1]).slice(0, 15); // Top 15
+    updateChart('agentCount', { labels: sortedAgents.map(a => a[0]), datasets: [{ label: 'Calls', data: sortedAgents.map(a => a[1]), backgroundColor: 'rgba(124, 110, 247, 0.6)' }] }, 'bar');
+
+    // 4. Done vs Pending
+    const donePending = data.reduce((acc, row) => {
+        const agent = row['Agent Name'] || 'Unassigned';
+        if (!acc[agent]) acc[agent] = { Done: 0, Pending: 0 };
+        if (row.Status1 === 'Done') acc[agent].Done++;
+        if (row.Status1 === 'Pending') acc[agent].Pending++;
+        return acc;
+    }, {});
+    const sortedDonePending = Object.entries(donePending).sort((a, b) => (b[1].Done + b[1].Pending) - (a[1].Done + a[1].Pending)).slice(0, 15);
+    updateChart('doneVsPending', {
+        labels: sortedDonePending.map(a => a[0]),
+        datasets: [
+            { label: 'Done', data: sortedDonePending.map(a => a[1].Done), backgroundColor: 'var(--green)' },
+            { label: 'Pending', data: sortedDonePending.map(a => a[1].Pending), backgroundColor: 'var(--danger)' }
+        ]
+    }, 'bar', { scales: { x: { stacked: true }, y: { stacked: true } } });
+
+    // 5. Hour-wise Distribution
+    const hourCounts = Array(24).fill(0);
+    data.forEach(row => {
+        if (row.Date) {
+            const date = parseDate(String(row.Date)); // Ensure string is passed
+            if (date) {
+                const hour = date.getHours();
+                hourCounts[hour]++;
+            }
+        }
+    });
+    updateChart('hourDistribution', { labels: Array.from({ length: 24 }, (_, i) => `${i}:00`), datasets: [{ label: 'Calls', data: hourCounts, backgroundColor: 'rgba(247, 161, 78, 0.6)' }] }, 'bar');
+    updateChart('hourDistribution', { labels: Array.from({ length: 24 }, (_, i) => `${i}:00`), datasets: [{ label: 'Calls', data: hourCounts, backgroundColor: 'rgba(247, 161, 78, 0.6)' }] }, 'bar', { scales: { x: { ticks: { maxRotation: 0, minRotation: 0 } } } });
+}
+
+function updateChart(chartId, data, type = 'line', options = {}) { // Removed duplicate function
+    const ctx = document.getElementById(chartId)?.getContext('2d');
+    if (!ctx) return;
+    if (charts[chartId]) {
+        charts[chartId].data = data;
+        charts[chartId].update();
+    } else {
+        charts[chartId] = new Chart(ctx, {
+            type: type,
+            data: data,
+            type,
+            data,
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: 'var(--muted)' } } },
+                scales: { x: { ticks: { color: 'var(--muted)' }, grid: { color: 'rgba(255,255,255,0.05)' } }, y: { ticks: { color: 'var(--muted)' }, grid: { color: 'rgba(255,255,255,0.05)' } } },
+                ...options
+            }
+        });
+    }
+}
+
+// ── Render ────────────────────────────────────────────────
+
+function renderTable() {
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page  = filtered.slice(start, start + PAGE_SIZE);
+  if (!headers.length) { setLoading(false); return; }
+  const tableHTML = `
+    <table>
+      <thead><tr>
+        <th style="width:40px">#</th>
+        ${headers.map(h => `
+          <th onclick="toggleSort('${h}')" class="${sortCol===h?'active':''}">
+            ${esc(h)} <span class="sort-icon">${sortCol===h?(sortAsc?'▲':'▼'):'⇅'}</span>
+          </th>`).join("")}
+        <th>Actions</th>
+      </tr></thead>
+      <tbody>
+        ${page.length ? page.map((row, i) => {
+          const sheetRow = allData.indexOf(row) + 2; // +2 for header row
+          return `<tr>
+            <td class="row-num">${start + i + 1}</td>
+            ${headers.map(h => `<td>${formatCell(row[h])}</td>`).join("")}
+            <td>
+              <div class="action-cell">
+                <button class="icon-btn" onclick="openEditModal(${sheetRow})">✎ Edit</button>
+                <button class="icon-btn del" onclick="deleteRow(${sheetRow})">✕</button>
+              </div>
+            </td>
+          </tr>`;
+        }).join("") : `<tr><td colspan="${headers.length + 2}" class="state-msg">No matching rows.</td></tr>`}
+      </tbody>
+    </table>`;
+  document.getElementById("table-container").innerHTML = tableHTML;
+  renderPagination();
+  setLoading(false);
+}
+
+function renderPagination() {
+  const total = Math.ceil(filtered.length / PAGE_SIZE);
+  const el    = document.getElementById("pagination");
+  if (total <= 1) { el.innerHTML = ""; return; }
+  let html = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹ Prev</button>`;
+  for (let p = 1; p <= total; p++) {
+    if (total > 7 && Math.abs(p - currentPage) > 2 && p !== 1 && p !== total) {
+      if (p === 2 || p === total - 1) html += `<span style="color:var(--muted);padding:0 .25rem">…</span>`;
+      continue;
+    }
+    html += `<button class="page-btn${p===currentPage?' active':''}" onclick="goPage(${p})">${p}</button>`;
+  }
+  html += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===total?'disabled':''}>Next ›</button>`;
+  el.innerHTML = html;
+}
+
+function goPage(p) { currentPage = p; renderTable(); }
+
+function toggleSort(col) {
+  if (sortCol === col) sortAsc = !sortAsc; else { sortCol = col; sortAsc = true; }
+  applyFilter();
+}
+
+// ── Modal ─────────────────────────────────────────────────
+
+function openAddModal() {
+  editRowIndex = null;
+  document.getElementById("modal-title").textContent = "Add Row";
+  document.getElementById("modal-save-btn").textContent = "Add";
+  buildForm({});
+  document.getElementById("modal-overlay").classList.add("open");
+}
+
+function openEditModal(sheetRow) {
+  editRowIndex = sheetRow;
+  const rowData = allData[sheetRow - 2]; // sheetRow 2 = allData[0]
+  document.getElementById("modal-title").textContent = "Edit Row " + sheetRow;
+  document.getElementById("modal-save-btn").textContent = "Update";
+  buildForm(rowData || {});
+  document.getElementById("modal-overlay").classList.add("open");
+}
+
+function closeModal() {
+  document.getElementById("modal-overlay").classList.remove("open");
+}
+
+function buildForm(data) {
+  document.getElementById("modal-form").innerHTML = headers.map(h => `
+    <div class="form-row">
+      <label>${esc(h)}</label>
+      <input id="field-${esc(h)}" value="${esc(String(data[h] ?? ''))}" placeholder="${esc(h)}" />
+    </div>`).join("");
+}
+
+async function saveModal() {
+  const data = {};
+  headers.forEach(h => {
+    data[h] = document.getElementById("field-" + h).value;
+  });
+  const action  = editRowIndex ? "update" : "append";
+  const payload = editRowIndex
+    ? { action, rowIndex: editRowIndex, data }
+    : { action, data };
+  try {
+    const res  = await fetch(API_URL, {
+      method: "POST", redirect: "follow",
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error);
+    toast(json.message, "ok");
+    closeModal();
+    await fetchData();
+  } catch (e) { toast("Error: " + e.message, "err"); }
+}
+
+// ── Delete ────────────────────────────────────────────────
+
+async function deleteRow(sheetRow) {
+  if (!confirm(`Delete row ${sheetRow} from the sheet?`)) return;
+  try {
+    const res  = await fetch(API_URL, {
+      method: "POST", redirect: "follow",
+      body: JSON.stringify({ action: "delete", rowIndex: sheetRow })
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error);
+    toast(json.message, "ok");
+    await fetchData();
+  } catch (e) { toast("Error: " + e.message, "err"); }
+}
+
+// ── CSV Export ────────────────────────────────────────────
+
+function exportCSV() {
+  if (!headers.length) return;
+  const rows = [headers, ...filtered.map(r => headers.map(h => `"${String(r[h]).replace(/"/g,'""')}"`))]
+    .map(r => r.join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([rows], {type:"text/csv"}));
+  a.download = "app-data-" + Date.now() + ".csv";
+  a.click();
+}
+
+// ── Helpers ───────────────────────────────────────────────
+
+function buildColFilter() {
+  const sel = document.getElementById("col-filter");
+  sel.innerHTML = `<option value="">All columns</option>` +
+    headers.map(h => `<option value="${esc(h)}">${esc(h)}</option>`).join("");
+
+}
+
+function parseDate(dateString) {
+    if (!dateString || typeof dateString !== 'string') {
+        return null;
+    }
+
+    // Split the date string to avoid timezone issues with new Date(string)
+    // This handles both 'YYYY-MM-DD' and 'YYYY-MM-DD HH:MM:SS'
+    const datePart = dateString.split(' ')[0];
+    const parts = datePart.split('-');
+    if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1; // JS months are 0-11
+        const day = parseInt(parts[2], 10);
+        const date = new Date(year, month, day);
+        // Check for time part
+        const timePart = dateString.split(' ')[1];
+        if (timePart && timePart.includes(':')) { date.setHours(...timePart.split(':').map(Number)); }
+        return date;
+    }
+
+    // Fallback for any other format
+    return new Date(dateString);
+}
+
+function formatCell(val) {
+  if (val === "" || val == null) return `<span style="color:var(--muted)">—</span>`;
+  if (!isNaN(val) && val !== "") return `<span style="font-family:var(--mono)">${Number(val).toLocaleString()}</span>`;
+  const s = String(val);
+  if (s.startsWith("http")) return `<a href="${s}" target="_blank" style="color:var(--accent)">${s.length>40?s.slice(0,40)+'…':s}</a>`;
+  return esc(s);
+}
+
+function setLoading(on) {
+  if (!on) return;
+  document.getElementById("table-container").innerHTML =
+    `<div class="state-msg"><div class="spinner"></div>Loading…</div>`;
+}
+
+function setError(msg) {
+  document.getElementById("table-container").innerHTML =
+    `<div class="state-msg" style="color:var(--danger)">${msg}</div>`;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let toastTimer;
+function toast(msg, type) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = "show " + (type || "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = "", 3000);
+}
+
+// Close modal on overlay click
+document.getElementById("modal-overlay").addEventListener("click", e => {
+  // Close modal only if the dark overlay itself is clicked, not the modal content.
+  if (e.target === e.currentTarget) closeModal();
+});
 </script>
 </body>
 </html>
+    </div>
+  </div>
+
+  <!-- Consolidated Report -->
+  <h2 id="report-title" style="font-size: 1.2rem; margin-top: 2rem; margin-bottom: 1rem;">Agent Performance Report</h2>
+  <div class="table-wrap">
+    <div id="consolidated-table-container"></div>
+  </div>
+  
