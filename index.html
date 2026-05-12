@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Inventory Team Incoming Calls Report</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0e0e10;
+    --surface:   #17171a;
+    --card:      #1e1e22;
+    --border:    #2e2e34;
+    --accent:    #7c6ef7;
+    --accent2:   #3ecf8e;
+    --green:     #3ecf8e;
+    --accent3:   #f7a14e;
+    --text:      #e8e8ec;
+    --muted:     #8a8a96;
+    --danger:    #f06060;
+    --mono:      'DM Mono', monospace;
+    --sans:      'Syne', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 2rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 100;
+    flex-wrap: wrap;
+    gap: .75rem;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 1.1rem; font-weight: 700; letter-spacing: -.02em;
+  }
+  .logo-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 12px var(--accent);
+  }
+  .header-meta { font-size: .75rem; font-family: var(--mono); color: var(--muted); }
+  .btn {
+    background: var(--accent); color: #fff; border: none;
+    padding: .5rem 1.1rem; border-radius: 6px; font-family: var(--sans);
+    font-size: .82rem; font-weight: 600; cursor: pointer;
+    transition: opacity .15s;
+  }
+  .btn:hover { opacity: .85; }
+  .btn.secondary {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .btn.secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+  }
+  .date-filter-group { display: flex; align-items: center; gap: .5rem; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+
+  /* Setup Banner */
+  #setup-banner {
+    background: linear-gradient(90deg, #1a1540 0%, #191f2a 100%);
+    border-bottom: 1px solid #2e2e55;
+    padding: 1.25rem 2rem;
+    display: flex; align-items: flex-start; gap: 1rem;
+  }
+  #setup-banner.hidden { display: none; }
+  .setup-icon { font-size: 1.5rem; margin-top: 2px; }
+  .setup-content h3 { font-size: .95rem; font-weight: 600; color: #aca8ff; margin-bottom: .4rem; }
+  .setup-content p  { font-size: .8rem; color: var(--muted); line-height: 1.6; }
+  .setup-url-row { display: flex; gap: 8px; margin-top: .75rem; }
+  #api-url-input {
+    flex: 1; background: #0e0e18; border: 1px solid #3a3a60;
+    color: var(--text); padding: .45rem .75rem; border-radius: 6px;
+    font-family: var(--mono); font-size: .8rem; outline: none;
+  }
+  #api-url-input:focus { border-color: var(--accent); }
+
+  main { padding: 2rem; }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem; margin-bottom: 2rem;
+  }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.25rem;
+    display: flex; flex-direction: column; gap: .3rem;
+  }
+  .stat-label { font-size: .7rem; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .stat-value { font-size: 1.9rem; font-weight: 700; line-height: 1; }
+  .stat-sub   { font-size: .72rem; color: var(--muted); }
+  .c-accent  { color: var(--accent); }
+  .c-green   { color: var(--accent2); }
+  .c-red     { color: var(--danger); }
+  .c-amber   { color: var(--accent3); }
+
+  .status-pills { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:2rem; }
+  .status-pill {
+    display:flex; align-items:center; gap:6px;
+    background:var(--card); border:1px solid var(--border);
+    border-radius:20px; padding:.3rem .85rem;
+    font-size:.75rem; font-family:var(--mono);
+    cursor:pointer; transition:all .15s; user-select:none;
+  }
+  .status-pill:hover { border-color:var(--accent); }
+  .status-pill.active { border-color:var(--accent); background:rgba(124,110,247,.12); }
+  .pill-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .pill-count { font-weight:700; }
+
+  .charts-grid { display:grid; grid-template-columns: repeat(12, 1fr); gap: 1.5rem; margin-bottom: 2rem; }
+  .chart-container { position: relative; height: 280px; }
+  .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  .chart-card h3 { font-size: .8rem; font-family: var(--mono); color: var(--muted); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: .06em; }
+  .chart-card.col-span-6 { grid-column: span 12; }
+  .chart-card.col-span-4 { grid-column: span 12; }
+  .chart-card.col-span-8 { grid-column: span 12; }
+  .chart-card.col-span-12 { grid-column: span 12; }
+  @media (min-width: 1024px) {
+    .chart-card.col-span-6 { grid-column: span 6; }
+    .chart-card.col-span-4 { grid-column: span 4; }
+    .chart-card.col-span-8 { grid-column: span 8; }
+    .chart-card.col-span-12 { grid-column: span 12; }
+  }
+
+  .toolbar {
+    display: flex; gap: .75rem; align-items: center;
+    margin-bottom: 1.25rem; flex-wrap: wrap;
+  }
+  .search-box {
+    flex: 1; min-width: 200px;
+    background: var(--card); border: 1px solid var(--border);
+    color: var(--text); padding: .5rem .9rem; border-radius: 6px;
+    font-family: var(--sans); font-size: .85rem; outline: none;
+  }
+  .search-box:focus { border-color: var(--accent); }
+  .search-box::placeholder { color: var(--muted); }
+
+  .table-wrap {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  thead th {
+    background: var(--surface); padding: .75rem 1rem;
+    text-align: left; font-weight: 600; font-family: var(--mono);
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  thead th:hover { color: var(--text); }
+  thead th .sort-icon { margin-left: 4px; opacity: .4; }
+  thead th.active .sort-icon { opacity: 1; color: var(--accent); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(124, 110, 247, .05); }
+  tbody td { padding: .7rem 1rem; color: var(--text); word-break: break-word; }
+  .row-num { color: var(--muted); font-family: var(--mono); font-size: .72rem; }
+  .action-cell { display: flex; gap: 6px; }
+  .icon-btn {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); padding: 3px 8px; border-radius: 5px;
+    font-size: .75rem; cursor: pointer; transition: all .15s;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .icon-btn.del:hover { border-color: var(--danger); color: var(--danger); }
+
+  .state-msg {
+    text-align: center; padding: 3rem 2rem;
+    color: var(--muted); font-size: .9rem;
+  }
+  .spinner {
+    width: 32px; height: 32px; border: 3px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin .7s linear infinite; margin: 0 auto 1rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 500; opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  .overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 1.75rem; width: 480px; max-width: 95vw;
+    max-height: 80vh; overflow-y: auto;
+  }
+  .modal h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1.25rem; }
+  .form-row { margin-bottom: 1rem; }
+  .form-row label { display: block; font-size: .75rem; font-family: var(--mono); color: var(--muted); margin-bottom: .3rem; }
+  .form-row input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: .5rem .75rem; border-radius: 6px;
+    font-size: .85rem; font-family: var(--sans); outline: none;
+  }
+  .form-row input:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; gap: .75rem; margin-top: 1.5rem; justify-content: flex-end; }
+
+  #toast {
+    position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 999;
+    background: var(--card); border: 1px solid var(--border);
+    padding: .7rem 1.1rem; border-radius: 8px; font-size: .82rem;
+    transition: opacity .3s; opacity: 0; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+  #toast.ok   { border-left: 3px solid var(--accent2); }
+  #toast.err  { border-left: 3px solid var(--danger); }
+
+  .pagination { display: flex; gap: .5rem; align-items: center; margin-top: 1.25rem; justify-content: center; flex-wrap: wrap; }
+  .page-btn   { background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: .35rem .75rem; border-radius: 5px; cursor: pointer; font-size: .82rem; }
+  .page-btn:hover, .page-btn.active { border-color: var(--accent); color: var(--accent); }
+  .page-btn:disabled { opacity: .4; cursor: default; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    Inventory Team Incoming Calls Report
+  </div>
+  <div class="header-meta" id="last-sync">Not synced yet</div>
+  <div class="header-actions">
+    <div class="date-filter-group">
+      <label for="start-date-filter" class="sr-only">Start Date</label>
+      <input type="date" id="start-date-filter" class="search-box" onchange="onDateRangeChange()" style="flex:0;min-width:160px;">
+      <span style="color:var(--muted)">-</span>
+      <label for="end-date-filter" class="sr-only">End Date</label>
+      <input type="date" id="end-date-filter" class="search-box" onchange="onDateRangeChange()" style="flex:0;min-width:160px;">
+    </div>
+    <div style="width:1px; height: 24px; background: var(--border);"></div>
+    <button class="btn secondary" onclick="openAddModal()">+ Add Row</button>
+    <button class="btn" onclick="fetchData()">↻ Refresh</button>
+  </div>
+</header>
+
+<!-- Connection Error Banner -->
+<div id="conn-banner" style="display:none; background:#1a1215; border-bottom:1px solid #5a2020; padding:1rem 2rem;">
+  <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+    <div style="width:8px;height:8px;border-radius:50%;background:var(--danger);box-shadow:0 0 8px var(--danger);flex-shrink:0;"></div>
+    <div style="flex:1;">
+      <span style="font-size:.85rem;font-weight:600;color:#f49090;">Google Apps Script not accessible</span>
+      <span style="font-size:.78rem;color:var(--muted);margin-left:.75rem;" id="retry-msg">Retrying automatically…</span>
+    </div>
+    <div style="font-size:.75rem;font-family:var(--mono);color:var(--muted);background:var(--card);padding:.4rem .8rem;border-radius:6px;border:1px solid var(--border);">
+      Fix: Deploy → Manage deployments → Edit → Who has access: <strong style="color:#f49090;">Anyone</strong> → New version → Deploy
+    </div>
+    <button class="btn" style="background:var(--danger);padding:.4rem .9rem;font-size:.78rem;" onclick="fetchData()">↻ Retry Now</button>
+  </div>
+</div>
+
+<main>
+  <!-- Stats -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Total Calls</div>
+      <div class="stat-value c-accent" id="stat-total-calls">—</div>
+      <div class="stat-sub">For selected period</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Done Calls</div>
+      <div class="stat-value c-green" id="stat-done-calls">—</div>
+      <div class="stat-sub" id="stat-done-percentage">&nbsp;</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pending Calls</div>
+      <div class="stat-value c-red" id="stat-pending-calls">—</div>
+      <div class="stat-sub"></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Closed Calls</div>
+      <div class="stat-value c-amber" id="stat-closed-calls">—</div>
+      <div class="stat-sub">Status: "Close"</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Calls/Day</div>
+      <div class="stat-value" id="stat-avg-calls">—</div>
+      <div class="stat-sub">Based on active days</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Done/Day</div>
+      <div class="stat-value" id="stat-avg-done-calls">—</div>
+      <div class="stat-sub">Based on active days</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active Days</div>
+      <div class="stat-value" id="stat-active-days">—</div>
+      <div class="stat-sub">Days with calls</div>
+    </div>
+  </div>
+
+  <!-- Status Pills -->
+  <div class="status-pills" id="status-pills"></div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <input class="search-box" id="search-input" placeholder="Search across all columns…" oninput="applyFilter()" />
+    <select class="search-box" id="agent-filter" style="flex:0;min-width:160px;" onchange="onFilterChange()"></select>
+    <select class="search-box" id="interaction-filter" style="flex:0;min-width:160px;" onchange="onFilterChange()"></select>
+    <select class="search-box" id="col-filter" style="flex:0;min-width:140px;" onchange="applyFilter()">
+      <option value="">All columns</option>
+    </select>
+    <button class="btn secondary" onclick="exportCSV()">⬇ Export CSV</button>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-grid">
+    <div class="chart-card col-span-8">
+      <h3>Daily Call Trend</h3><div class="chart-container"><canvas id="dailyTrend"></canvas></div>
+    </div>
+    <div class="chart-card col-span-4">
+      <h3>Status Distribution</h3><div class="chart-container"><canvas id="statusPie"></canvas></div>
+    </div>
+    <div class="chart-card col-span-6">
+      <h3>Agent-wise Call Count</h3><div class="chart-container"><canvas id="agentCount"></canvas></div>
+    </div>
+    <div class="chart-card col-span-6">
+      <h3>Done vs Pending by Agent</h3><div class="chart-container"><canvas id="doneVsPending"></canvas></div>
+    </div>
+    <div class="chart-card col-span-12">
+      <h3>Hour-wise Call Distribution</h3><div class="chart-container" style="height:240px;"><canvas id="hourDistribution"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <div id="table-container">
+      <div class="state-msg"><div class="spinner"></div>Loading…</div>
+    </div>
+  </div>
+  <div class="pagination" id="pagination"></div>
+</main>
+
+<!-- Add/Edit Modal -->
+<div class="overlay" id="modal-overlay">
+  <div class="modal">
+    <h2 id="modal-title">Add Row</h2>
+    <div id="modal-form"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" id="modal-save-btn" onclick="saveModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── CONFIG ────────────────────────────────────────────────────────────────
+const API_URL = "https://script.google.com/macros/s/AKfycbyJYtCzOM8OidJw2ZkbQz63zvts247Lhud2Vt0tttDjShsMpmcgmgoGguzJw7RcUZnK/exec";
+
+// ─── STATE ─────────────────────────────────────────────────────────────────
+let allData        = [];
+let headers        = [];
+let filtered       = [];
+let sortCol        = "";
+let sortAsc        = true;
+let currentPage    = 1;
+const PAGE_SIZE    = 20;
+let editRowIndex   = null;
+let activeStatus   = "";
+let activeAgent    = "";
+let activeInteraction = "";
+const charts       = {};
+let isLoading      = false;
+
+// ─── BOOTSTRAP ─────────────────────────────────────────────────────────────
+(function init() {
+  const now       = new Date();
+  const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endDate   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  document.getElementById('start-date-filter').value = toDateInputValue(startDate);
+  document.getElementById('end-date-filter').value   = toDateInputValue(endDate);
+  fetchData();
+  setInterval(fetchData, 5 * 60 * 1000);
+})();
+
+// ─── FETCH ─────────────────────────────────────────────────────────────────
+let retryTimer = null;
+let retryCount = 0;
+
+async function fetchData() {
+  if (!API_URL) return;
+  showTableSpinner();
+  try {
+    const res  = await fetch(API_URL, { redirect: "follow" });
+    const text = await res.text();
+    // Detect the "Host not in allowlist" plain-text error from Google
+    if (text.includes("Host not in allowlist") || text.includes("not in allowlist")) {
+      throw new Error("not_in_allowlist");
+    }
+    const json = JSON.parse(text);
+    if (!json.success) throw new Error(json.error || "API returned success:false");
+    // ✅ Success — hide error banner, clear retry
+    document.getElementById("conn-banner").style.display = "none";
+    clearTimeout(retryTimer);
+    retryCount = 0;
+    allData  = json.data || [];
+    headers  = allData.length ? Object.keys(allData[0]) : [];
+    buildColFilter();
+    applyFilter();
+    document.getElementById("last-sync").textContent =
+      "Synced " + new Date().toLocaleTimeString();
+  } catch (e) {
+    const isAllowlist = e.message === "not_in_allowlist";
+    // Show error banner
+    document.getElementById("conn-banner").style.display = "block";
+    retryCount++;
+    const nextRetry = Math.min(30, retryCount * 5); // 5s, 10s, 15s… max 30s
+    document.getElementById("retry-msg").textContent =
+      isAllowlist
+        ? `Script not yet public. Retrying in ${nextRetry}s (attempt ${retryCount})…`
+        : `Error: ${e.message}. Retrying in ${nextRetry}s…`;
+    showTableError(
+      isAllowlist
+        ? "⚠ Google Apps Script is not publicly accessible yet. Please redeploy with <strong>Who has access: Anyone</strong>."
+        : "Failed to fetch data: " + e.message
+    );
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(fetchData, nextRetry * 1000);
+  }
+}
+
+// ─── DATE RANGE ─────────────────────────────────────────────────────────────
+function onDateRangeChange() { applyFilter(); }
+function onFilterChange()    { applyFilter(); }
+
+function getRangeData() {
+  const startStr = document.getElementById("start-date-filter").value;
+  const endStr   = document.getElementById("end-date-filter").value;
+  if (!startStr || !endStr) return allData.slice();
+
+  const startDate = parseDate(startStr);
+  const endDate   = parseDate(endStr);
+  if (!startDate || !endDate) return allData.slice();
+  endDate.setHours(23, 59, 59, 999);
+
+  return allData.filter(row => {
+    const rowDate = parseDate(row.Date);
+    return rowDate && rowDate >= startDate && rowDate <= endDate;
+  });
+}
+
+// ─── FILTER & SORT ─────────────────────────────────────────────────────────
+function applyFilter() {
+  const q   = document.getElementById("search-input").value.toLowerCase();
+  const col = document.getElementById("col-filter").value;
+  activeAgent       = document.getElementById("agent-filter").value;
+  activeInteraction = document.getElementById("interaction-filter").value;
+
+  const rangeData = getRangeData();
+
+  // KPI cards and pills always reflect the full date-range (ignoring search/agent/status filters)
+  calculateAndRenderStats(rangeData);
+  buildStatusPills(rangeData);
+  buildDynamicFilters(rangeData);
+
+  // Apply remaining filters for table & charts
+  filtered = rangeData.filter(row => {
+    const statusOk      = activeStatus === "" || String(row['value'] || row.Status1 || "").trim() === activeStatus;
+    const agentOk       = activeAgent === ""   || (row['Agent Name'] || "") === activeAgent;
+    const interactionOk = activeInteraction === "" || (row['Interaction Type'] || "") === activeInteraction;
+    const target        = col ? String(row[col] ?? "") : Object.values(row).join(" ");
+    const searchOk      = target.toLowerCase().includes(q);
+    return statusOk && agentOk && interactionOk && searchOk;
+  });
+
+  // Sort before handing to charts & table
+  if (sortCol) {
+    filtered.sort((a, b) => {
+      const va = a[sortCol], vb = b[sortCol];
+      const cmp = (isNaN(va) || isNaN(vb))
+        ? String(va ?? "").localeCompare(String(vb ?? ""))
+        : Number(va) - Number(vb);
+      return sortAsc ? cmp : -cmp;
+    });
+  }
+
+  renderCharts(filtered);
+  currentPage = 1;
+  renderTable();  // <-- this is the only place that populates #table-container
+}
+
+// ─── KPI STATS ──────────────────────────────────────────────────────────────
+function calculateAndRenderStats(data) {
+  const total    = data.filter(r => r.Date && String(r.Date).trim() !== "").length;
+  const done     = data.filter(r => String(r['value'] || r.Status1 || "").trim() === 'Done').length;
+  const closed   = data.filter(r => String(r['value'] || r.Status1 || "").trim() === 'Close').length;
+  const pending  = data.filter(r => String(r['value'] || r.Status1 || "").trim() === 'Pending').length;
+  const uniqueDates = new Set(data.map(r => r.Date ? String(r.Date).split(' ')[0] : null).filter(Boolean));
+  const activeDays  = uniqueDates.size || 1;
+
+  document.getElementById('stat-total-calls').textContent   = total;
+  document.getElementById('stat-done-calls').textContent    = done;
+  document.getElementById('stat-pending-calls').textContent = pending;
+  document.getElementById('stat-closed-calls').textContent  = closed;
+  document.getElementById('stat-active-days').textContent   = uniqueDates.size;
+  document.getElementById('stat-done-percentage').textContent = total > 0
+    ? `${((done / total) * 100).toFixed(1)}% of total` : '0%';
+  document.getElementById('stat-avg-calls').textContent     = (total / activeDays).toFixed(1);
+  document.getElementById('stat-avg-done-calls').textContent = (done / activeDays).toFixed(1);
+}
+
+// ─── STATUS PILLS ───────────────────────────────────────────────────────────
+function buildStatusPills(data) {
+  const counts = {};
+  data.forEach(row => {
+    const s = String(row['value'] || row.Status1 || "").trim();
+    if (s) counts[s] = (counts[s] || 0) + 1;
+  });
+  const allPill = `<div class="status-pill${activeStatus === '' ? ' active' : ''}" onclick="setStatusFilter('')">
+    <span class="pill-dot" style="background:var(--muted)"></span>All <span class="pill-count">${data.length}</span></div>`;
+  const pills = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([s, c]) => {
+    const color = s === 'Done' ? 'var(--green)' : s === 'Pending' ? 'var(--danger)' : 'var(--accent3)';
+    return `<div class="status-pill${activeStatus === s ? ' active' : ''}" onclick="setStatusFilter('${esc(s)}')">
+      <span class="pill-dot" style="background:${color}"></span>${esc(s)} <span class="pill-count">${c}</span></div>`;
+  }).join("");
+  document.getElementById("status-pills").innerHTML = allPill + pills;
+}
+
+function setStatusFilter(s) { activeStatus = s; applyFilter(); }
+
+// ─── DYNAMIC FILTERS ────────────────────────────────────────────────────────
+function buildDynamicFilters(data) {
+  const agentSel       = document.getElementById("agent-filter");
+  const interactionSel = document.getElementById("interaction-filter");
+  const agents         = [...new Set(data.map(r => r['Agent Name']).filter(Boolean))].sort();
+  const interactions   = [...new Set(data.map(r => r['Interaction Type']).filter(Boolean))].sort();
+
+  agentSel.innerHTML       = `<option value="">All Agents</option>` + agents.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  interactionSel.innerHTML = `<option value="">All Interactions</option>` + interactions.map(i => `<option value="${esc(i)}">${esc(i)}</option>`).join('');
+  agentSel.value           = activeAgent;
+  interactionSel.value     = activeInteraction;
+}
+
+// ─── CHARTS ─────────────────────────────────────────────────────────────────
+function renderCharts(data) {
+  // 1. Daily Call Trend
+  const dailyCounts = {};
+  data.forEach(row => {
+    if (row.Date) {
+      const d = String(row.Date).split(' ')[0];
+      dailyCounts[d] = (dailyCounts[d] || 0) + 1;
+    }
+  });
+  const sortedDaily = Object.entries(dailyCounts).sort((a, b) => new Date(a[0]) - new Date(b[0]));
+  updateChart('dailyTrend', {
+    labels: sortedDaily.map(d => d[0]),
+    datasets: [{ label: 'Total Calls', data: sortedDaily.map(d => d[1]), borderColor: '#7c6ef7', backgroundColor: 'rgba(124,110,247,0.15)', fill: true, tension: 0.3, pointBackgroundColor: '#7c6ef7' }]
+  });
+
+  // 2. Status Pie
+  const statusCounts = {};
+  data.forEach(row => { const s = String(row['value'] || row.Status1 || 'N/A').trim(); statusCounts[s] = (statusCounts[s] || 0) + 1; });
+  updateChart('statusPie', {
+    labels: Object.keys(statusCounts),
+    datasets: [{ data: Object.values(statusCounts), backgroundColor: Object.keys(statusCounts).map(s => s === 'Done' ? '#3ecf8e' : s === 'Pending' ? '#f06060' : '#f7a14e'), borderWidth: 0 }]
+  }, 'doughnut');
+
+  // 3. Agent-wise Call Count
+  const agentCounts = {};
+  data.forEach(row => { const a = row['Agent Name'] || 'Unassigned'; agentCounts[a] = (agentCounts[a] || 0) + 1; });
+  const sortedAgents = Object.entries(agentCounts).sort((a, b) => b[1] - a[1]).slice(0, 15);
+  updateChart('agentCount', {
+    labels: sortedAgents.map(a => a[0]),
+    datasets: [{ label: 'Calls', data: sortedAgents.map(a => a[1]), backgroundColor: 'rgba(124,110,247,0.65)', borderRadius: 4 }]
+  }, 'bar');
+
+  // 4. Done vs Pending by Agent
+  const donePending = {};
+  data.forEach(row => {
+    const a = row['Agent Name'] || 'Unassigned';
+    if (!donePending[a]) donePending[a] = { Done: 0, Pending: 0 };
+    const s = String(row['value'] || row.Status1 || "").trim();
+    if (s === 'Done')    donePending[a].Done++;
+    if (s === 'Pending') donePending[a].Pending++;
+  });
+  const sortedDP = Object.entries(donePending).sort((a, b) => (b[1].Done + b[1].Pending) - (a[1].Done + a[1].Pending)).slice(0, 15);
+  updateChart('doneVsPending', {
+    labels: sortedDP.map(a => a[0]),
+    datasets: [
+      { label: 'Done',    data: sortedDP.map(a => a[1].Done),    backgroundColor: '#3ecf8e', borderRadius: 4 },
+      { label: 'Pending', data: sortedDP.map(a => a[1].Pending), backgroundColor: '#f06060', borderRadius: 4 }
+    ]
+  }, 'bar', { scales: { x: { stacked: true }, y: { stacked: true } } });
+
+  // 5. Hour-wise Distribution
+  const hourCounts = Array(24).fill(0);
+  data.forEach(row => {
+    if (row.Date) {
+      const d = parseDate(String(row.Date));
+      if (d) hourCounts[d.getHours()]++;
+    }
+  });
+  updateChart('hourDistribution', {
+    labels: Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2,'0')}:00`),
+    datasets: [{ label: 'Calls', data: hourCounts, backgroundColor: 'rgba(247,161,78,0.65)', borderRadius: 4 }]
+  }, 'bar', { scales: { x: { ticks: { maxRotation: 0, minRotation: 0 } } } });
+}
+
+function updateChart(id, data, type = 'line', extraOptions = {}) {
+  const ctx = document.getElementById(id)?.getContext('2d');
+  if (!ctx) return;
+  const baseOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#8a8a96' } } },
+    scales: {
+      x: { ticks: { color: '#8a8a96' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+      y: { ticks: { color: '#8a8a96' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+  };
+  // Deep-merge scales if extraOptions provides them
+  const mergedOptions = { ...baseOptions, ...extraOptions,
+    plugins: { ...baseOptions.plugins, ...(extraOptions.plugins || {}) },
+    scales: { ...baseOptions.scales, ...(extraOptions.scales || {}) }
+  };
+
+  if (charts[id]) {
+    charts[id].data    = data;
+    charts[id].options = mergedOptions;
+    charts[id].update('none'); // 'none' = skip animation on update for speed
+  } else {
+    charts[id] = new Chart(ctx, { type, data, options: mergedOptions });
+  }
+}
+
+// ─── TABLE ──────────────────────────────────────────────────────────────────
+function renderTable() {
+  if (!allData.length) {
+    document.getElementById("table-container").innerHTML =
+      `<div class="state-msg">No data found. Check your API connection or date range.</div>`;
+    document.getElementById("pagination").innerHTML = "";
+    return;
+  }
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page  = filtered.slice(start, start + PAGE_SIZE);
+
+  const tableHTML = `
+    <table>
+      <thead><tr>
+        <th style="width:40px">#</th>
+        ${headers.map(h => `
+          <th onclick="toggleSort('${esc(h)}')" class="${sortCol === h ? 'active' : ''}">
+            ${esc(h)} <span class="sort-icon">${sortCol === h ? (sortAsc ? '▲' : '▼') : '⇅'}</span>
+          </th>`).join("")}
+        <th>Actions</th>
+      </tr></thead>
+      <tbody>
+        ${page.length
+          ? page.map((row, i) => {
+              const sheetRow = allData.indexOf(row) + 2;
+              return `<tr>
+                <td class="row-num">${start + i + 1}</td>
+                ${headers.map(h => `<td>${formatCell(row[h])}</td>`).join("")}
+                <td>
+                  <div class="action-cell">
+                    <button class="icon-btn" onclick="openEditModal(${sheetRow})">✎ Edit</button>
+                    <button class="icon-btn del" onclick="deleteRow(${sheetRow})">✕</button>
+                  </div>
+                </td>
+              </tr>`;
+            }).join("")
+          : `<tr><td colspan="${headers.length + 2}" class="state-msg">No matching rows.</td></tr>`
+        }
+      </tbody>
+    </table>`;
+
+  document.getElementById("table-container").innerHTML = tableHTML;
+  renderPagination();
+}
+
+function renderPagination() {
+  const total = Math.ceil(filtered.length / PAGE_SIZE);
+  const el    = document.getElementById("pagination");
+  if (total <= 1) { el.innerHTML = ""; return; }
+  let html = `<button class="page-btn" onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>‹ Prev</button>`;
+  for (let p = 1; p <= total; p++) {
+    if (total > 7 && Math.abs(p - currentPage) > 2 && p !== 1 && p !== total) {
+      if (p === 2 || p === total - 1) html += `<span style="color:var(--muted);padding:0 .25rem">…</span>`;
+      continue;
+    }
+    html += `<button class="page-btn${p === currentPage ? ' active' : ''}" onclick="goPage(${p})">${p}</button>`;
+  }
+  html += `<button class="page-btn" onclick="goPage(${currentPage + 1})" ${currentPage === total ? 'disabled' : ''}>Next ›</button>`;
+  el.innerHTML = html;
+}
+
+function goPage(p) { currentPage = p; renderTable(); }
+
+function toggleSort(col) {
+  if (sortCol === col) sortAsc = !sortAsc; else { sortCol = col; sortAsc = true; }
+  applyFilter();
+}
+
+// ─── MODAL ──────────────────────────────────────────────────────────────────
+function openAddModal() {
+  editRowIndex = null;
+  document.getElementById("modal-title").textContent      = "Add Row";
+  document.getElementById("modal-save-btn").textContent   = "Add";
+  buildForm({});
+  document.getElementById("modal-overlay").classList.add("open");
+}
+
+function openEditModal(sheetRow) {
+  editRowIndex = sheetRow;
+  const rowData = allData[sheetRow - 2];
+  document.getElementById("modal-title").textContent      = "Edit Row " + sheetRow;
+  document.getElementById("modal-save-btn").textContent   = "Update";
+  buildForm(rowData || {});
+  document.getElementById("modal-overlay").classList.add("open");
+}
+
+function closeModal() { document.getElementById("modal-overlay").classList.remove("open"); }
+
+function buildForm(data) {
+  document.getElementById("modal-form").innerHTML = headers.map(h => `
+    <div class="form-row">
+      <label>${esc(h)}</label>
+      <input id="field-${esc(h)}" value="${esc(String(data[h] ?? ''))}" placeholder="${esc(h)}" />
+    </div>`).join("");
+}
+
+async function saveModal() {
+  const data = {};
+  headers.forEach(h => { data[h] = document.getElementById("field-" + h)?.value ?? ""; });
+  const action  = editRowIndex ? "update" : "append";
+  const payload = editRowIndex ? { action, rowIndex: editRowIndex, data } : { action, data };
+  try {
+    const res  = await fetch(API_URL, { method: "POST", redirect: "follow", body: JSON.stringify(payload) });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error);
+    toast(json.message, "ok");
+    closeModal();
+    await fetchData();
+  } catch (e) { toast("Error: " + e.message, "err"); }
+}
+
+// ─── DELETE ─────────────────────────────────────────────────────────────────
+async function deleteRow(sheetRow) {
+  if (!confirm(`Delete row ${sheetRow} from the sheet?`)) return;
+  try {
+    const res  = await fetch(API_URL, { method: "POST", redirect: "follow", body: JSON.stringify({ action: "delete", rowIndex: sheetRow }) });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error);
+    toast(json.message, "ok");
+    await fetchData();
+  } catch (e) { toast("Error: " + e.message, "err"); }
+}
+
+// ─── CSV EXPORT ─────────────────────────────────────────────────────────────
+function exportCSV() {
+  if (!headers.length) return;
+  const rows = [headers, ...filtered.map(r => headers.map(h => `"${String(r[h] ?? '').replace(/"/g, '""')}"`))]
+    .map(r => r.join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href     = URL.createObjectURL(new Blob([rows], { type: "text/csv" }));
+  a.download = "calls-report-" + Date.now() + ".csv";
+  a.click();
+}
+
+// ─── HELPERS ────────────────────────────────────────────────────────────────
+function buildColFilter() {
+  const sel = document.getElementById("col-filter");
+  sel.innerHTML = `<option value="">All columns</option>` +
+    headers.map(h => `<option value="${esc(h)}">${esc(h)}</option>`).join("");
+}
+
+function toDateInputValue(date) {
+  // Returns 'YYYY-MM-DD' without timezone shift
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function parseDate(dateString) {
+  if (!dateString || typeof dateString !== 'string') return null;
+  const datePart = dateString.split(' ')[0];
+  const parts    = datePart.split('-');
+  if (parts.length !== 3) return null;
+  const year  = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const day   = parseInt(parts[2], 10);
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
+  const date  = new Date(year, month, day);
+  const timePart = dateString.split(' ')[1];
+  if (timePart && timePart.includes(':')) {
+    const [h, m, s] = timePart.split(':').map(Number);
+    date.setHours(h || 0, m || 0, s || 0);
+  }
+  return date;
+}
+
+function formatCell(val) {
+  if (val === "" || val == null) return `<span style="color:var(--muted)">—</span>`;
+  const s = String(val);
+  if (s.startsWith("http")) return `<a href="${s}" target="_blank" style="color:var(--accent)">${s.length > 40 ? s.slice(0, 40) + '…' : s}</a>`;
+  if (!isNaN(val) && s !== "") return `<span style="font-family:var(--mono)">${Number(val).toLocaleString()}</span>`;
+  return esc(s);
+}
+
+// FIX: showTableSpinner only shows spinner — never clears on hide
+function showTableSpinner() {
+  document.getElementById("table-container").innerHTML =
+    `<div class="state-msg"><div class="spinner"></div>Loading…</div>`;
+}
+
+function showTableError(msg) {
+  document.getElementById("table-container").innerHTML =
+    `<div class="state-msg" style="color:var(--danger)">⚠ ${esc(msg)}</div>`;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+let toastTimer;
+function toast(msg, type) {
+  const el    = document.getElementById("toast");
+  el.textContent = msg;
+  el.className   = "show " + (type || "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = "", 3000);
+}
+
+document.getElementById("modal-overlay").addEventListener("click", e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+</script>
+</body>
+</html>
